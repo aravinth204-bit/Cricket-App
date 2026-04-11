@@ -191,7 +191,7 @@ function Setup({ onSetupComplete }) {
       </div>
 
       {/* Match Info Card */}
-      <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ padding: '0 20px 100px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div style={{ background: 'white', borderRadius: '20px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
           <label style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px', display: 'block', marginBottom: '10px' }}>
             Ground / Venue
@@ -300,7 +300,7 @@ function Setup({ onSetupComplete }) {
             width: '100%', background: '#2563eb', color: 'white', border: 'none',
             borderRadius: '16px', padding: '18px', fontSize: '16px', fontWeight: 800,
             cursor: 'pointer', boxShadow: '0 10px 30px rgba(37,99,235,0.25)',
-            letterSpacing: '1px', marginBottom: '16px'
+            letterSpacing: '1px', marginBottom: '24px'
           }}
         >
             START MATCH
