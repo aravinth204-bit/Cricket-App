@@ -1,157 +1,592 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 
-function Scoreboard({ data, onUpdateMatchData }) {
-  const [events, setEvents] = useState(data?.events || []);
-  const [editChoice, setEditChoice] = useState('0');
+const WICKET_TYPES = ['Bowled', 'Caught', 'LBW', 'Run Out', 'Stumped', 'Hit Wicket', 'Retired'];
+const NEEDS_FIELDER = ['Caught', 'Run Out', 'Stumped'];
 
-  // Openers are passed directly from the PlayerSelection screen
-  const initialBatsmen = useMemo(() => [
-    { name: data.batsmen[0], runs: 0, balls: 0 },
-    { name: data.batsmen[1], runs: 0, balls: 0 }
-  ], [data.batsmen]);
+const sr = (runs, balls) => (balls === 0 ? 0 : ((runs / balls) * 100).toFixed(1));
 
-  const replayEvents = (eventsToReplay) => {
-    const resultBatsmen = initialBatsmen.map(b => ({ ...b }));
-    const resultBowler = { name: data.bowler, overs: 0, runs: 0 };
-    let teamScore = { score: 0, wickets: 0 };
-    let overs = 0;
-    let ballsInOver = 0;
-    let striker = 0;
-    let nextPlayerIndex = 2;
+// ── PDF Generator (opens print window) ────────────────────────────────────────
+export function printScorecard(m) {
+  const battingRows = (m.battingScorecard || []).map(b => `
+    <tr>
+      <td>${b.name}</td><td class="sm">${b.status || ''}</td>
+      <td class="n">${b.runs}</td><td class="n">${b.balls}</td>
+      <td class="n">${b.fours || 0}</td><td class="n">${b.sixes || 0}</td>
+      <td class="n">${sr(b.runs, b.balls)}</td>
+    </tr>`).join('');
 
-    eventsToReplay.forEach((event) => {
-      if (event.type === 'run') {
-        teamScore.score += event.runs;
-        resultBatsmen[striker].runs += event.runs;
-        resultBatsmen[striker].balls += 1;
-        resultBowler.runs += event.runs;
-        if (event.runs % 2 === 1) striker = 1 - striker;
-      } else {
-        teamScore.wickets += 1;
-        // Auto-fill with generic names for wickets if no player list
-        resultBatsmen[striker] = { name: `Opponent ${nextPlayerIndex + 1}`, runs: 0, balls: 0 };
-        nextPlayerIndex += 1;
-      }
-      ballsInOver += 1;
-      if (ballsInOver === 6) { overs += 1; ballsInOver = 0; }
+  const bowlingRows = (m.bowlingScorecard || []).map(b => `
+    <tr>
+      <td>${b.name}</td><td class="n">${b.overs}</td>
+      <td class="n">${b.runs}</td><td class="n">${b.wkts}</td>
+    </tr>`).join('');
+
+  const extras = m.extras
+    ? `Wd:${m.extras.wides} Nb:${m.extras.noBalls} B:${m.extras.byes} Lb:${m.extras.legByes}`
+    : '';
+
+  const html = `<!DOCTYPE html><html><head>
+  <meta charset="utf-8" />
+  <title>ACTIVE 11S - Scorecard</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 24px; color: #0f172a; }
+    .header { text-align: center; border-bottom: 3px solid #2563eb; padding-bottom: 16px; margin-bottom: 20px; }
+    .brand { font-size: 26px; font-weight: 900; color: #2563eb; letter-spacing: -1px; }
+    .match-info { font-size: 13px; color: #64748b; margin-top: 4px; }
+    .score-box { display: flex; justify-content: space-between; background: #1e3a8a; color: white; border-radius: 12px; padding: 18px 24px; margin-bottom: 20px; }
+    .team-score h2 { margin: 0; font-size: 14px; opacity: 0.7; }
+    .team-score .runs { font-size: 36px; font-weight: 900; letter-spacing: -2px; }
+    .team-score .overs { font-size: 13px; opacity: 0.6; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 13px; }
+    th { background: #2563eb; color: white; padding: 8px 10px; text-align: left; font-size: 11px; letter-spacing: 0.5px; }
+    td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; }
+    tr:hover td { background: #f8fafc; }
+    .n { text-align: right; font-weight: 700; }
+    .sm { color: #94a3b8; font-size: 11px; }
+    .section-title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin: 16px 0 8px; }
+    .awards { display: flex; gap: 20px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; }
+    .award-item { font-size: 13px; }
+    .award-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #b45309; }
+    .award-name { font-size: 16px; font-weight: 800; color: #0f172a; }
+    .footer { text-align: center; font-size: 11px; color: #94a3b8; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 12px; }
+    @media print { body { padding: 0 12px; } }
+  </style>
+</head><body>
+  <div class="header">
+    <div class="brand">ACTIVE 11'S</div>
+    <div class="match-info">${m.ground} &nbsp;|&nbsp; ${m.date}</div>
+  </div>
+
+  <div class="score-box">
+    <div class="team-score" style="text-align:left">
+      <h2>${m.teamALogo || ''} ${m.teamAName}</h2>
+      ${m.teamAScore !== undefined
+        ? `<div class="runs">${m.teamAScore}/${m.teamAWkts}</div><div class="overs">${m.teamAOvers} Overs</div>`
+        : `<div style="opacity:0.5;font-size:14px">Yet to bat</div>`}
+    </div>
+    <div style="font-size:18px;align-self:center;opacity:0.4">vs</div>
+    <div class="team-score" style="text-align:right">
+      <h2>${m.teamBName} ${m.teamBLogo || ''}</h2>
+      ${m.teamBScore !== undefined
+        ? `<div class="runs">${m.teamBScore}/${m.teamBWkts}</div><div class="overs">${m.teamBOvers} Overs</div>`
+        : `<div style="opacity:0.5;font-size:14px">Yet to bat</div>`}
+    </div>
+  </div>
+
+  ${(m.potm || m.bestBowler) ? `
+  <div class="awards">
+    ${m.potm ? `<div class="award-item"><div class="award-label">🏆 Player of Match</div><div class="award-name">${m.potm}</div></div>` : ''}
+    ${m.bestBowler ? `<div class="award-item"><div class="award-label">🎳 Best Bowler</div><div class="award-name">${m.bestBowler}</div></div>` : ''}
+  </div>` : ''}
+
+  ${m.battingScorecard && m.battingScorecard.length > 0 ? `
+  <div class="section-title">⚡ Batting — ${m.battingTeam || ''}</div>
+  <table>
+    <thead><tr><th>Batsman</th><th>Dismissal</th><th class="n">R</th><th class="n">B</th><th class="n">4s</th><th class="n">6s</th><th class="n">SR</th></tr></thead>
+    <tbody>${battingRows}</tbody>
+    <tfoot><tr><td colspan="2" style="font-weight:700">Extras</td><td colspan="5" style="text-align:right;color:#64748b;font-size:12px">${extras}</td></tr></tfoot>
+  </table>` : ''}
+
+  ${m.bowlingScorecard && m.bowlingScorecard.length > 0 ? `
+  <div class="section-title">🎳 Bowling</div>
+  <table>
+    <thead><tr><th>Bowler</th><th class="n">O</th><th class="n">R</th><th class="n">W</th></tr></thead>
+    <tbody>${bowlingRows}</tbody>
+  </table>` : ''}
+
+  <div class="footer">Generated by ACTIVE 11S Cricket App &nbsp;•&nbsp; ${new Date().toLocaleDateString()}</div>
+  <script>setTimeout(() => window.print(), 400);</script>
+</body></html>`;
+
+  const win = window.open('', '_blank');
+  if (win) { win.document.write(html); win.document.close(); }
+}
+
+// ── Scoreboard ────────────────────────────────────────────────────────────────
+function Scoreboard({ data, onMatchEnd }) {
+  const [totalScore, setTotalScore] = useState(0);
+  const [wkts, setWkts] = useState(0);
+  const [legalBalls, setLegalBalls] = useState(0);
+  const [extrasState, setExtrasState] = useState({ wides: 0, noBalls: 0, byes: 0, legByes: 0 });
+  const [batsmen, setBatsmen] = useState([
+    { name: data.batsmen[0], runs: 0, balls: 0, fours: 0, sixes: 0 },
+    { name: data.batsmen[1], runs: 0, balls: 0, fours: 0, sixes: 0 },
+  ]);
+  const [striker, setStriker] = useState(0);
+  const [dismissed, setDismissed] = useState([]);
+  const [bowler, setBowler] = useState({ name: data.bowler, balls: 0, runs: 0, wkts: 0 });
+  const [doneBowlers, setDoneBowlers] = useState([]);
+  const [overHistory, setOverHistory] = useState([]);
+  const [currOver, setCurrOver] = useState([]);
+
+  // ── Snapshot undo ──────────────────────────────────────────────────────────
+  const [snapHistory, setSnapHistory] = useState([]);
+  const getCurrentSnap = () => ({
+    totalScore, wkts, legalBalls, extrasState: { ...extrasState },
+    batsmen: batsmen.map(b => ({ ...b })), striker,
+    dismissed: dismissed.map(d => ({ ...d })), bowler: { ...bowler },
+    doneBowlers: doneBowlers.map(b => ({ ...b })),
+    overHistory: overHistory.map(o => [...o]), currOver: [...currOver],
+  });
+  const takeSnap = () => setSnapHistory(h => [...h, getCurrentSnap()]);
+  const undoLastBall = () => {
+    if (snapHistory.length === 0) return;
+    const prev = snapHistory[snapHistory.length - 1];
+    setSnapHistory(h => h.slice(0, -1));
+    setTotalScore(prev.totalScore); setWkts(prev.wkts); setLegalBalls(prev.legalBalls);
+    setExtrasState(prev.extrasState); setBatsmen(prev.batsmen); setStriker(prev.striker);
+    setDismissed(prev.dismissed); setBowler(prev.bowler); setDoneBowlers(prev.doneBowlers);
+    setOverHistory(prev.overHistory); setCurrOver(prev.currOver);
+  };
+
+  // ── Modals ─────────────────────────────────────────────────────────────────
+  const [wicketModal, setWicketModal] = useState(false);
+  const [wkType, setWkType] = useState('');
+  const [fielder, setFielder] = useState('');
+  const [newBatName, setNewBatName] = useState('');
+  const [bowlerModal, setBowlerModal] = useState(false);
+  const [newBowlerName, setNewBowlerName] = useState('');
+  const [endModal, setEndModal] = useState(false);
+  const [potm, setPotm] = useState('');
+  const [bestBowlerAward, setBestBowlerAward] = useState('');
+  const [tab, setTab] = useState('score');
+
+  const overs = Math.floor(legalBalls / 6);
+  const ballsThisOver = legalBalls % 6;
+  const totalExtras = extrasState.wides + extrasState.noBalls + extrasState.byes + extrasState.legByes;
+  const totalOvers = data.totalOvers || 20;
+  const battingTeamLogo = data.battingTeam === data.teamA.name ? data.teamA.logo : data.teamB.logo;
+
+  // ── Core ball commit ───────────────────────────────────────────────────────
+  const commitLegal = ({ batsmanRuns = 0, creditBatsman = true, label = '•' }) => {
+    takeSnap();
+    const newLB = legalBalls + 1;
+    const newBTO = newLB % 6;
+    setTotalScore(sc => sc + batsmanRuns);
+    const nb = batsmen.map((b, i) => i !== striker ? b : {
+      ...b,
+      runs: creditBatsman ? b.runs + batsmanRuns : b.runs,
+      balls: b.balls + 1,
+      fours: creditBatsman && batsmanRuns === 4 ? b.fours + 1 : b.fours,
+      sixes: creditBatsman && batsmanRuns === 6 ? b.sixes + 1 : b.sixes,
     });
-
-    resultBowler.overs = overs;
-    return { teamScore, overs, ballsInOver, batsmen: resultBatsmen, bowler: resultBowler, striker };
+    setBatsmen(nb);
+    const newBowler = { ...bowler, balls: bowler.balls + 1, runs: bowler.runs + batsmanRuns };
+    setBowler(newBowler);
+    const newCurrOver = [...currOver, label];
+    if (newBTO === 0) {
+      setOverHistory(h => [...h, newCurrOver]);
+      setCurrOver([]);
+      setLegalBalls(newLB);
+      let ns = 1 - striker;
+      if (batsmanRuns % 2 === 1) ns = striker;
+      setStriker(ns);
+      setDoneBowlers(db => [...db, { ...newBowler, overs: Math.floor(newLB / 6) }]);
+      setBowlerModal(true);
+    } else {
+      setCurrOver(newCurrOver);
+      setLegalBalls(newLB);
+      if (batsmanRuns % 2 === 1) setStriker(s => 1 - s);
+    }
   };
 
-  const matchState = useMemo(() => replayEvents(events), [events, initialBatsmen]);
+  const handleRun = (runs) => commitLegal({ batsmanRuns: runs, creditBatsman: true, label: runs === 0 ? '•' : String(runs) });
 
-  useEffect(() => {
-    if (!onUpdateMatchData) return;
-    onUpdateMatchData({ ...data, events, currentScore: matchState.teamScore });
-  }, [events, matchState.teamScore, data, onUpdateMatchData]);
-
-  const addRun = (runs) => setEvents((prev) => [...prev, { type: 'run', runs }]);
-  const addWicket = () => setEvents((prev) => [...prev, { type: 'wicket' }]);
-  
-  const replaceLastBall = () => {
-    if (events.length === 0) return;
-    const newEvent = editChoice === 'Wicket' ? { type: 'wicket' } : { type: 'run', runs: Number(editChoice) };
-    setEvents((prev) => [...prev.slice(0, -1), newEvent]);
+  const handleWide = () => {
+    takeSnap();
+    setTotalScore(sc => sc + 1);
+    setExtrasState(e => ({ ...e, wides: e.wides + 1 }));
+    setBowler(b => ({ ...b, runs: b.runs + 1 }));
+    setCurrOver(co => [...co, 'Wd']);
   };
 
-  const currentBattingTeamLogo = data.battingTeam === data.teamA.name ? data.teamA.logo : data.teamB.logo;
+  const handleNoBall = (batsmanRuns = 0) => {
+    takeSnap();
+    const total = 1 + batsmanRuns;
+    setTotalScore(sc => sc + total);
+    setExtrasState(e => ({ ...e, noBalls: e.noBalls + 1 }));
+    setBowler(b => ({ ...b, runs: b.runs + total }));
+    if (batsmanRuns > 0) {
+      setBatsmen(bm => bm.map((b, i) => i !== striker ? b : {
+        ...b, runs: b.runs + batsmanRuns,
+        fours: batsmanRuns === 4 ? b.fours + 1 : b.fours,
+        sixes: batsmanRuns === 6 ? b.sixes + 1 : b.sixes,
+      }));
+    }
+    setCurrOver(co => [...co, batsmanRuns > 0 ? `Nb+${batsmanRuns}` : 'Nb']);
+    if (total % 2 === 1) setStriker(s => 1 - s);
+  };
 
+  const handleBye = (runs) => {
+    setExtrasState(e => ({ ...e, byes: e.byes + runs }));
+    commitLegal({ batsmanRuns: runs, creditBatsman: false, label: `B${runs}` });
+  };
+
+  const handleLegBye = (runs) => {
+    setExtrasState(e => ({ ...e, legByes: e.legByes + runs }));
+    commitLegal({ batsmanRuns: runs, creditBatsman: false, label: `Lb${runs}` });
+  };
+
+  const openWicketModal = () => { setWkType(''); setFielder(''); setNewBatName(''); setWicketModal(true); };
+
+  const confirmWicket = () => {
+    if (!wkType) return;
+    takeSnap();
+    const newLB = legalBalls + 1;
+    const newBTO = newLB % 6;
+    const out = { ...batsmen[striker], balls: batsmen[striker].balls + 1, how: wkType + (fielder ? ` (${fielder})` : '') };
+    setDismissed(d => [...d, out]);
+    setWkts(w => w + 1);
+    const bowlerWkt = !['Run Out', 'Handled Ball', 'Retired'].includes(wkType);
+    const newBowler = { ...bowler, balls: bowler.balls + 1, wkts: bowler.wkts + (bowlerWkt ? 1 : 0) };
+    setBowler(newBowler);
+    setBatsmen(bm => bm.map((b, i) => i === striker ? { name: newBatName.trim() || `Batsman ${wkts + 3}`, runs: 0, balls: 0, fours: 0, sixes: 0 } : b));
+    const newCurrOver = [...currOver, 'W'];
+    setLegalBalls(newLB);
+    setWicketModal(false);
+    if (newBTO === 0) {
+      setOverHistory(h => [...h, newCurrOver]);
+      setCurrOver([]);
+      setStriker(s => 1 - s);
+      setDoneBowlers(db => [...db, { ...newBowler, overs: Math.floor(newLB / 6) }]);
+      setBowlerModal(true);
+    } else {
+      setCurrOver(newCurrOver);
+    }
+  };
+
+  const confirmNewBowler = () => {
+    setBowler({ name: newBowlerName.trim() || `Bowler ${doneBowlers.length + 2}`, balls: 0, runs: 0, wkts: 0 });
+    setNewBowlerName('');
+    setBowlerModal(false);
+  };
+
+  const saveAndEnd = () => {
+    const isTeamABatting = data.battingTeam === data.teamA.name;
+    const allBowlersList = [...doneBowlers, { ...bowler, overs: Math.floor(bowler.balls / 6) }];
+    const summary = {
+      ground: data.groundName,
+      date: new Date().toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      teamAName: data.teamA.name, teamALogo: data.teamA.logo,
+      teamAScore: isTeamABatting ? totalScore : undefined,
+      teamAWkts: isTeamABatting ? wkts : undefined,
+      teamAOvers: isTeamABatting ? `${overs}.${ballsThisOver}` : undefined,
+      teamBName: data.teamB.name, teamBLogo: data.teamB.logo,
+      teamBScore: !isTeamABatting ? totalScore : undefined,
+      teamBWkts: !isTeamABatting ? wkts : undefined,
+      teamBOvers: !isTeamABatting ? `${overs}.${ballsThisOver}` : undefined,
+      potm, bestBowler: bestBowlerAward,
+      battingTeam: data.battingTeam, totalOvers: data.totalOvers,
+      extras: extrasState,
+      battingScorecard: [
+        ...dismissed.map(b => ({ ...b, status: b.how })),
+        ...batsmen.map((b, i) => ({ ...b, status: i === striker ? 'not out *' : 'not out' }))
+      ],
+      bowlingScorecard: allBowlersList.map(b => ({ name: b.name, overs: `${Math.floor(b.balls / 6)}.${b.balls % 6}`, runs: b.runs, wkts: b.wkts }))
+    };
+    if (onMatchEnd) onMatchEnd(summary);
+  };
+
+  // ── Shared helpers ─────────────────────────────────────────────────────────
+  const runBtnStyle = (bg = '#f1f5f9', col = '#0f172a') => ({
+    flex: 1, minHeight: '56px', background: bg, border: 'none',
+    borderRadius: '16px', fontSize: '20px', fontWeight: 800, color: col,
+    cursor: 'pointer', fontFamily: 'inherit',
+  });
+
+  const ballDot = (label, i) => {
+    const isWide = label === 'Wd', isNb = label.startsWith('Nb'), isW = label === 'W';
+    const isFour = label === '4', isSix = label === '6';
+    const bg = isW ? '#ef4444' : isFour ? '#3b82f6' : isSix ? '#8b5cf6' : isWide || isNb ? '#f59e0b' : '#e2e8f0';
+    const col = (isW || isFour || isSix || isWide || isNb) ? 'white' : '#0f172a';
+    return <div key={i} style={{ minWidth: '36px', height: '36px', borderRadius: '50%', background: bg, color: col, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800 }}>{label}</div>;
+  };
+
+  const inpSt = { width: '100%', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '14px 16px', fontSize: '16px', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', color: '#0f172a' };
+
+  const Overlay = ({ children }) => (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div style={{ background: 'white', borderRadius: '28px 28px 0 0', padding: '24px 20px 40px', width: '100%', maxWidth: '480px' }}>
+        {children}
+      </div>
+    </div>
+  );
+
+  // ── SCORECARD VIEW ─────────────────────────────────────────────────────────
+  if (tab === 'card') {
+    const thSt = { fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', padding: '8px 4px', textAlign: 'left' };
+    const tdSt = { fontSize: '13px', padding: '10px 4px', borderBottom: '1px solid #f1f5f9', color: '#0f172a' };
+    const tdNum = { ...tdSt, textAlign: 'right', fontWeight: 700 };
+    return (
+      <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: "'Outfit', sans-serif" }}>
+        <div style={{ background: '#2563eb', color: 'white', padding: '40px 20px 20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, opacity: 0.7 }}>{data.groundName}</div>
+            <button onClick={() => setTab('score')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>← Back</button>
+          </div>
+          <div style={{ fontSize: '14px', fontWeight: 700, opacity: 0.8 }}>{data.battingTeam} Innings</div>
+          <div style={{ fontSize: '40px', fontWeight: 900, letterSpacing: '-2px' }}>{totalScore}/{wkts}</div>
+          <div style={{ fontSize: '14px', opacity: 0.7 }}>{overs}.{ballsThisOver} Overs • Extras: {totalExtras}</div>
+        </div>
+        <div style={{ padding: '20px' }}>
+          <div style={{ background: 'white', borderRadius: '16px', padding: '16px', marginBottom: '16px', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
+            <div style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', color: '#2563eb', marginBottom: '12px' }}>Batting</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead><tr>
+                <th style={{ ...thSt, width: '36%' }}>Batsman</th>
+                <th style={{ ...thSt, textAlign: 'right' }}>R</th><th style={{ ...thSt, textAlign: 'right' }}>B</th>
+                <th style={{ ...thSt, textAlign: 'right' }}>4s</th><th style={{ ...thSt, textAlign: 'right' }}>6s</th>
+                <th style={{ ...thSt, textAlign: 'right' }}>SR</th>
+              </tr></thead>
+              <tbody>
+                {dismissed.map((b, i) => (
+                  <tr key={i}>
+                    <td style={tdSt}><div style={{ fontWeight: 700 }}>{b.name}</div><div style={{ fontSize: '10px', color: '#94a3b8' }}>{b.how}</div></td>
+                    <td style={tdNum}>{b.runs}</td><td style={tdNum}>{b.balls}</td>
+                    <td style={tdNum}>{b.fours}</td><td style={tdNum}>{b.sixes}</td><td style={tdNum}>{sr(b.runs, b.balls)}</td>
+                  </tr>
+                ))}
+                {batsmen.map((b, i) => (
+                  <tr key={`bat-${i}`}>
+                    <td style={tdSt}><div style={{ fontWeight: 700, color: i === striker ? '#2563eb' : undefined }}>{b.name}{i === striker ? ' *' : ''}</div><div style={{ fontSize: '10px', color: '#10b981' }}>batting</div></td>
+                    <td style={tdNum}>{b.runs}</td><td style={tdNum}>{b.balls}</td>
+                    <td style={tdNum}>{b.fours}</td><td style={tdNum}>{b.sixes}</td><td style={tdNum}>{sr(b.runs, b.balls)}</td>
+                  </tr>
+                ))}
+                <tr><td style={{ ...tdSt, fontWeight: 700 }} colSpan={3}>Extras</td><td style={tdNum} colSpan={3}>{totalExtras} (wd {extrasState.wides}, nb {extrasState.noBalls}, b {extrasState.byes}, lb {extrasState.legByes})</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div style={{ background: 'white', borderRadius: '16px', padding: '16px', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
+            <div style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', color: '#8b5cf6', marginBottom: '12px' }}>Bowling</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead><tr>
+                <th style={{ ...thSt, width: '40%' }}>Bowler</th>
+                <th style={{ ...thSt, textAlign: 'right' }}>O</th><th style={{ ...thSt, textAlign: 'right' }}>R</th>
+                <th style={{ ...thSt, textAlign: 'right' }}>W</th><th style={{ ...thSt, textAlign: 'right' }}>Econ</th>
+              </tr></thead>
+              <tbody>
+                {doneBowlers.map((b, i) => (
+                  <tr key={i}>
+                    <td style={tdSt}><div style={{ fontWeight: 700 }}>{b.name}</div></td>
+                    <td style={tdNum}>{b.overs}</td><td style={tdNum}>{b.runs}</td><td style={tdNum}>{b.wkts}</td>
+                    <td style={tdNum}>{b.overs > 0 ? (b.runs / b.overs).toFixed(2) : '-'}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td style={{ ...tdSt, color: '#2563eb', fontWeight: 700 }}>{bowler.name} *</td>
+                  <td style={tdNum}>{Math.floor(bowler.balls / 6)}.{bowler.balls % 6}</td>
+                  <td style={tdNum}>{bowler.runs}</td><td style={tdNum}>{bowler.wkts}</td>
+                  <td style={tdNum}>{Math.floor(bowler.balls / 6) > 0 ? (bowler.runs / (bowler.balls / 6)).toFixed(2) : '-'}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── SCORING VIEW ───────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#f1f5f9] p-4 flex flex-col items-center">
-      
-      {/* Dynamic Header */}
-      <div className="w-full max-w-sm mb-6 flex justify-between items-center px-2">
-        <h1 className="brand-title text-sm font-black text-slate-800">
-          ACTIVE <span className="text-primary italic">11'S</span>
-        </h1>
-        <div className="text-right">
-          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{data.groundName}</div>
-          <div className="text-[10px] font-black text-primary uppercase">IN-PLAY</div>
+    <div style={{ minHeight: '100vh', background: '#f1f5f9', fontFamily: "'Outfit', sans-serif" }}>
+      {/* Header */}
+      <div style={{ background: '#1e3a8a', color: 'white', padding: '36px 20px 20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '16px' }}>
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: 700, opacity: 0.6, textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '4px' }}>{battingTeamLogo} {data.battingTeam}</div>
+            <div style={{ fontSize: '52px', fontWeight: 900, lineHeight: 1, letterSpacing: '-3px' }}>{totalScore}<span style={{ color: '#60a5fa', margin: '0 4px' }}>/</span>{wkts}</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '26px', fontWeight: 800 }}>{overs}.{ballsThisOver}</div>
+            <div style={{ fontSize: '10px', opacity: 0.5, textTransform: 'uppercase' }}>/ {totalOvers} Overs</div>
+            <div style={{ display: 'flex', gap: '6px', marginTop: '8px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setTab('card')} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', padding: '5px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>Scorecard</button>
+              <button onClick={() => setEndModal(true)} style={{ background: 'rgba(239,68,68,0.3)', border: '1px solid rgba(239,68,68,0.5)', color: 'white', padding: '5px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>End Match</button>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: '10px', fontWeight: 700, opacity: 0.5, textTransform: 'uppercase', marginBottom: '8px' }}>This Over</div>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', minHeight: '36px', alignItems: 'center' }}>
+            {currOver.length === 0 ? <div style={{ fontSize: '12px', opacity: 0.3 }}>No balls yet</div> : currOver.map((l, i) => ballDot(l, i))}
+          </div>
         </div>
       </div>
 
-      <div className="w-full max-w-md bg-white rounded-[32px] overflow-hidden shadow-2xl shadow-slate-200">
-        
-        {/* Score Card Header */}
-        <div className="p-8 bg-slate-900 text-white relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 rounded-full -mr-16 -mt-16 blur-3xl"></div>
-          
-          <div className="flex justify-between items-start mb-8">
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-2xl">{currentBattingTeamLogo}</span>
-                <span className="text-xs font-black uppercase tracking-widest text-primary">{data.battingTeam}</span>
+      <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {/* Batsmen */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          {batsmen.map((b, i) => {
+            const isStr = i === striker;
+            return (
+              <div key={i} style={{ background: isStr ? '#eff6ff' : 'white', borderRadius: '16px', padding: '14px', border: `2px solid ${isStr ? '#2563eb' : '#e2e8f0'}`, boxShadow: isStr ? '0 0 0 4px rgba(37,99,235,0.08)' : '0 2px 6px rgba(0,0,0,0.04)' }}>
+                <div style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', color: isStr ? '#2563eb' : '#94a3b8', letterSpacing: '1px', marginBottom: '4px' }}>{isStr ? 'Striker ●' : 'Non-Str'}</div>
+                <div style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.name}</div>
+                <div style={{ fontSize: '22px', fontWeight: 900, color: isStr ? '#2563eb' : '#0f172a' }}>{b.runs}<span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600, marginLeft: '4px' }}>({b.balls})</span></div>
+                <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>4s: {b.fours}  6s: {b.sixes}  SR: {sr(b.runs, b.balls)}</div>
               </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-6xl font-black">{matchState.teamScore.score}</span>
-                <span className="text-2xl font-bold text-slate-500">/</span>
-                <span className="text-3xl font-bold text-slate-400">{matchState.teamScore.wickets}</span>
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-3xl font-black text-slate-100">{matchState.overs}.{matchState.ballsInOver}</div>
-              <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Overs Completed</div>
-            </div>
-          </div>
+            );
+          })}
+        </div>
 
-          {/* Batsmen Area */}
-          <div className="grid grid-cols-2 gap-4">
-            {matchState.batsmen.map((b, i) => (
-              <div key={i} className={`p-4 rounded-2xl border transition-all ${i === matchState.striker ? 'border-primary bg-primary/10' : 'border-white/5 bg-white/5 opacity-60'}`}>
-                <div className="flex justify-between items-center mb-1">
-                   <span className={`text-[9px] font-black uppercase ${i === matchState.striker ? 'text-primary' : 'text-slate-500'}`}>
-                    {i === matchState.striker ? 'Striker *' : 'Non-Str'}
-                   </span>
+        {/* Bowler + Controls */}
+        <div style={{ background: 'white', borderRadius: '16px', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}>
+          <div>
+            <div style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '1px' }}>Bowler</div>
+            <div style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a' }}>{bowler.name}</div>
+            <div style={{ fontSize: '10px', color: '#8b5cf6', fontWeight: 700 }}>{Math.floor(bowler.balls / 6)}.{bowler.balls % 6} ov  {bowler.runs} R  {bowler.wkts} W</div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={() => setStriker(s => 1 - s)} style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '8px 10px', fontSize: '11px', fontWeight: 800, color: '#15803d', cursor: 'pointer' }}>⇄ Swap</button>
+            <button onClick={undoLastBall} disabled={snapHistory.length === 0} style={{ background: snapHistory.length === 0 ? '#f8fafc' : '#fffbeb', border: '1.5px solid #fde68a', borderRadius: '12px', padding: '8px 10px', fontSize: '11px', fontWeight: 800, color: snapHistory.length === 0 ? '#cbd5e1' : '#b45309', cursor: snapHistory.length === 0 ? 'not-allowed' : 'pointer' }}>↩ Undo</button>
+          </div>
+        </div>
+
+        {/* Run Buttons */}
+        <div style={{ background: 'white', borderRadius: '20px', padding: '16px', boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}>
+          <div style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '1px', marginBottom: '12px' }}>Runs Off Bat</div>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+            {[0, 1, 2, 3].map(r => <button key={r} onClick={() => handleRun(r)} style={runBtnStyle()}>{r}</button>)}
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={() => handleRun(4)} style={{ ...runBtnStyle('#eff6ff', '#2563eb'), flexGrow: 1 }}>4</button>
+            <button onClick={() => handleRun(6)} style={{ ...runBtnStyle('#f5f3ff', '#7c3aed'), flexGrow: 1 }}>6</button>
+            <button onClick={openWicketModal} style={{ ...runBtnStyle('#fef2f2', '#dc2626'), flexGrow: 2, fontSize: '16px' }}>OUT</button>
+          </div>
+        </div>
+
+        {/* Extras */}
+        <div style={{ background: 'white', borderRadius: '20px', padding: '16px', boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}>
+          <div style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '1px', marginBottom: '12px' }}>
+            Extras — Wd:{extrasState.wides} Nb:{extrasState.noBalls} B:{extrasState.byes} Lb:{extrasState.legByes} (Total:{totalExtras})
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {[
+              { label: 'Wide', fn: handleWide, bg: '#fff7ed', bdr: '#fed7aa', col: '#c2410c' },
+              { label: 'No Ball', fn: () => handleNoBall(0), bg: '#fff7ed', bdr: '#fed7aa', col: '#c2410c' },
+              { label: 'Bye 1', fn: () => handleBye(1), bg: '#f8fafc', bdr: '#e2e8f0', col: '#475569' },
+              { label: 'Bye 2', fn: () => handleBye(2), bg: '#f8fafc', bdr: '#e2e8f0', col: '#475569' },
+              { label: 'LB 1', fn: () => handleLegBye(1), bg: '#f8fafc', bdr: '#e2e8f0', col: '#475569' },
+              { label: 'LB 2', fn: () => handleLegBye(2), bg: '#f8fafc', bdr: '#e2e8f0', col: '#475569' },
+            ].map(({ label, fn, bg, bdr, col }) => (
+              <button key={label} onClick={fn} style={{ flex: 1, minWidth: '60px', padding: '12px 6px', background: bg, border: `1.5px solid ${bdr}`, borderRadius: '12px', fontSize: '12px', fontWeight: 800, color: col, cursor: 'pointer' }}>{label}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Over History */}
+        {overHistory.length > 0 && (
+          <div style={{ background: 'white', borderRadius: '16px', padding: '14px 16px', boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}>
+            <div style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '1px', marginBottom: '10px' }}>Over History</div>
+            {overHistory.map((over, oi) => (
+              <div key={oi} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <span style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', minWidth: '28px' }}>Ov {oi + 1}</span>
+                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>{over.map((b, bi) => ballDot(b, bi))}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── WICKET MODAL ── */}
+      {wicketModal && (
+        <Overlay>
+          <div style={{ fontSize: '18px', fontWeight: 800, marginBottom: '4px' }}>How is {batsmen[striker].name} out?</div>
+          <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '16px' }}>{batsmen[striker].runs} runs off {batsmen[striker].balls} balls</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
+            {WICKET_TYPES.map(wt => (
+              <button key={wt} onClick={() => setWkType(wt)} style={{ padding: '10px 16px', borderRadius: '12px', border: '1.5px solid', borderColor: wkType === wt ? '#2563eb' : '#e2e8f0', background: wkType === wt ? '#eff6ff' : 'white', color: wkType === wt ? '#2563eb' : '#0f172a', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}>{wt}</button>
+            ))}
+          </div>
+          {wkType && NEEDS_FIELDER.includes(wkType) && (
+            <div style={{ marginBottom: '12px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '6px' }}>{wkType === 'Caught' ? 'Caught by' : wkType === 'Stumped' ? 'Stumped by' : 'Run Out by'}</div>
+              <input value={fielder} onChange={e => setFielder(e.target.value)} placeholder="Fielder name" style={inpSt} />
+            </div>
+          )}
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '6px' }}>New Batsman (leave blank to auto-fill)</div>
+            <input value={newBatName} onChange={e => setNewBatName(e.target.value)} placeholder={`Batsman ${wkts + 3}`} style={inpSt} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <button onClick={() => setWicketModal(false)} style={{ padding: '16px', borderRadius: '14px', border: '1.5px solid #e2e8f0', background: 'white', fontWeight: 700, fontSize: '14px', cursor: 'pointer' }}>Cancel</button>
+            <button onClick={confirmWicket} style={{ padding: '16px', borderRadius: '14px', border: 'none', background: '#dc2626', color: 'white', fontWeight: 800, fontSize: '14px', cursor: 'pointer', opacity: wkType ? 1 : 0.4 }}>Confirm OUT</button>
+          </div>
+        </Overlay>
+      )}
+
+      {/* ── NEW BOWLER MODAL ── */}
+      {bowlerModal && (
+        <Overlay>
+          <div style={{ fontSize: '18px', fontWeight: 800, marginBottom: '4px' }}>Over {overs} Complete!</div>
+          <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '16px' }}>Who bowls the next over?</div>
+          <input autoFocus value={newBowlerName} onChange={e => setNewBowlerName(e.target.value)} onKeyDown={e => e.key === 'Enter' && confirmNewBowler()} placeholder={`Bowler ${doneBowlers.length + 2}`} style={{ ...inpSt, marginBottom: '16px' }} />
+          <button onClick={confirmNewBowler} style={{ width: '100%', padding: '16px', borderRadius: '14px', border: 'none', background: '#2563eb', color: 'white', fontWeight: 800, fontSize: '16px', cursor: 'pointer' }}>
+            Start Over {overs + 1} →
+          </button>
+        </Overlay>
+      )}
+
+      {/* ── END MATCH MODAL ── */}
+      {endModal && (
+        <Overlay>
+          <div style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+            <div style={{ fontSize: '20px', fontWeight: 800, marginBottom: '4px' }}>End Match 🏆</div>
+            <div style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '18px' }}>Pick the awards before saving</div>
+
+            {/* Score preview */}
+            <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '14px', marginBottom: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '24px' }}>{data.teamA.logo}</span>
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 700 }}>{data.teamA.name}</div>
+                  {data.battingTeam === data.teamA.name
+                    ? <div style={{ fontSize: '20px', fontWeight: 900, color: '#2563eb' }}>{totalScore}/{wkts}</div>
+                    : <div style={{ fontSize: '12px', color: '#94a3b8' }}>Yet to bat</div>}
                 </div>
-                <div className="text-sm font-bold truncate text-white uppercase italic tracking-tight">{b.name}</div>
-                <div className="text-xl font-black text-white">{b.runs} <span className="text-[10px] text-slate-500 font-bold">({b.balls})</span></div>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Action Panel */}
-        <div className="p-8 space-y-8">
-          
-          <div className="flex justify-between items-center px-2">
-            <div>
-              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Current Bowler</div>
-              <div className="text-sm font-bold text-slate-800 uppercase italic tracking-tight">{matchState.bowler.name}</div>
+              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 700 }}>vs</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700 }}>{data.teamB.name}</div>
+                  {data.battingTeam === data.teamB.name
+                    ? <div style={{ fontSize: '20px', fontWeight: 900, color: '#2563eb' }}>{totalScore}/{wkts}</div>
+                    : <div style={{ fontSize: '12px', color: '#94a3b8' }}>Yet to bat</div>}
+                </div>
+                <span style={{ fontSize: '24px' }}>{data.teamB.logo}</span>
+              </div>
             </div>
-            <div className="text-right">
-              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Economy</div>
-              <div className="text-sm font-black text-primary">{matchState.overs}.{matchState.ballsInOver} - {matchState.bowler.runs}R</div>
+
+            {/* POTM */}
+            <div style={{ marginBottom: '18px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>🏆 Player of the Match</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
+                {[...dismissed.map(b => b.name), ...batsmen.map(b => b.name)].map((name, i) => (
+                  <button key={i} onClick={() => setPotm(name)} style={{ padding: '8px 14px', borderRadius: '20px', border: '1.5px solid', borderColor: potm === name ? '#f59e0b' : '#e2e8f0', background: potm === name ? '#fffbeb' : 'white', color: potm === name ? '#b45309' : '#475569', fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}>{name}</button>
+                ))}
+              </div>
+              <input placeholder="Or type a custom name..." value={potm} onChange={e => setPotm(e.target.value)} style={{ width: '100%', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '10px 14px', fontSize: '14px', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+            </div>
+
+            {/* Best Bowler */}
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 800, color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>🎳 Best Bowler</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
+                {[...doneBowlers.map(b => b.name), bowler.name].map((name, i) => (
+                  <button key={i} onClick={() => setBestBowlerAward(name)} style={{ padding: '8px 14px', borderRadius: '20px', border: '1.5px solid', borderColor: bestBowlerAward === name ? '#8b5cf6' : '#e2e8f0', background: bestBowlerAward === name ? '#f5f3ff' : 'white', color: bestBowlerAward === name ? '#7c3aed' : '#475569', fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}>{name}</button>
+                ))}
+              </div>
+              <input placeholder="Or type a custom name..." value={bestBowlerAward} onChange={e => setBestBowlerAward(e.target.value)} style={{ width: '100%', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '10px 14px', fontSize: '14px', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <button onClick={() => setEndModal(false)} style={{ padding: '16px', borderRadius: '14px', border: '1.5px solid #e2e8f0', background: 'white', fontWeight: 700, fontSize: '15px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+              <button onClick={saveAndEnd} style={{ padding: '16px', borderRadius: '14px', border: 'none', background: '#2563eb', color: 'white', fontWeight: 800, fontSize: '15px', cursor: 'pointer', fontFamily: 'inherit' }}>Save & Exit</button>
             </div>
           </div>
-
-          <div className="grid grid-cols-4 gap-3">
-            {[0, 1, 2, 3, 4, 6].map(run => (
-              <button key={run} onClick={() => addRun(run)} className="h-14 bg-slate-50 rounded-2xl border border-slate-100 text-slate-800 font-black text-xl hover:bg-primary hover:text-white transition-all active:scale-90">
-                {run}
-              </button>
-            ))}
-            <button onClick={addWicket} className="h-14 col-span-2 bg-rose-50 rounded-2xl border border-rose-100 text-rose-600 font-black text-sm tracking-widest hover:bg-rose-600 hover:text-white transition-all active:scale-95">
-              OUT
-            </button>
-          </div>
-
-          <div className="p-2 bg-slate-50 rounded-2xl border border-slate-100 flex gap-2">
-            <select 
-              value={editChoice} 
-              onChange={(e) => setEditChoice(e.target.value)} 
-              className="flex-1 bg-transparent border-none text-xs font-black text-slate-400 uppercase tracking-widest px-4 focus:ring-0"
-            >
-              {[0,1,2,3,4,6].map(r => <option key={r} value={r}>{r} Runs</option>)}
-              <option value="Wicket">Wicket</option>
-            </select>
-            <button onClick={replaceLastBall} className="h-10 px-6 bg-slate-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all">
-              Correct Last
-            </button>
-          </div>
-        </div>
-      </div>
+        </Overlay>
+      )}
     </div>
   );
 }
