@@ -612,9 +612,12 @@ function WeeklySeries({ onBack, matchHistory }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
               <input
                 autoFocus
-                placeholder="Team A name"
+                placeholder="My Team name"
                 value={newTeamA}
-                onChange={e => setNewTeamA(e.target.value)}
+                onChange={e => {
+                  const val = e.target.value;
+                  setNewTeamA(val ? val.charAt(0).toUpperCase() + val.slice(1) : '');
+                }}
                 style={{
                   width: '100%', background: '#f8fafc', border: '1.5px solid #e2e8f0',
                   borderRadius: '14px', padding: '16px', fontSize: '16px', outline: 'none',
@@ -623,9 +626,12 @@ function WeeklySeries({ onBack, matchHistory }) {
               />
               <div style={{ textAlign: 'center', fontSize: '20px', color: '#94a3b8' }}>⚔️</div>
               <input
-                placeholder="Team B name"
+                placeholder="Opponent name"
                 value={newTeamB}
-                onChange={e => setNewTeamB(e.target.value)}
+                onChange={e => {
+                  const val = e.target.value;
+                  setNewTeamB(val ? val.charAt(0).toUpperCase() + val.slice(1) : '');
+                }}
                 onKeyDown={e => e.key === 'Enter' && handleAddWeek()}
                 style={{
                   width: '100%', background: '#f8fafc', border: '1.5px solid #e2e8f0',

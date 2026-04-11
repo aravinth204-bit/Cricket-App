@@ -21,6 +21,40 @@ const NEEDS_FIELDER = ['Caught', 'Run Out', 'Stumped'];
 
 const sr = (runs, balls) => (balls === 0 ? 0 : ((runs / balls) * 100).toFixed(1));
 
+const renderLogo = (logo, size = '40px') => {
+  if (!logo) return null;
+  if (typeof logo === 'string' && (logo.endsWith('.png') || logo.startsWith('/'))) {
+    return <img src={logo} alt="logo" style={{ width: size, height: size, objectFit: 'contain' }} />;
+  }
+  return <span style={{ fontSize: size }}>{logo}</span>;
+};
+
+const renderLogoHtml = (logo, size = '24px') => {
+  if (!logo) return '';
+  if (typeof logo === 'string' && (logo.endsWith('.png') || logo.startsWith('/'))) {
+    return `<img src="${window.location.origin}${logo}" style="width:${size};height:${size};vertical-align:middle;margin-right:8px;object-fit:contain;">`;
+  }
+  return logo;
+};
+
+const Confetti = () => {
+  const pieces = Array.from({ length: 40 });
+  return pieces.map((_, i) => (
+    <div 
+      key={i} 
+      className="confetti" 
+      style={{ 
+        left: `${Math.random() * 100}vw`, 
+        backgroundColor: ['#f2d74e', '#95c3de', '#ff9a91', '#85cc6f', '#3b82f6'][Math.floor(Math.random() * 5)],
+        animationDelay: `${Math.random() * 2.5}s`,
+        width: `${Math.random() * 8 + 6}px`,
+        height: `${Math.random() * 8 + 6}px`,
+        borderRadius: Math.random() > 0.5 ? '50%' : '2px'
+      }} 
+    />
+  ));
+};
+
 // ── PDF Generator (opens print window) ────────────────────────────────────────
 export function printScorecard(m) {
   const battingRows = (m.battingScorecard || []).map(b => `
@@ -75,14 +109,14 @@ export function printScorecard(m) {
 
   <div class="score-box">
     <div class="team-score" style="text-align:left">
-      <h2>${m.teamALogo || ''} ${m.teamAName}</h2>
+      <h2>${renderLogoHtml(m.teamALogo, '18px')} ${m.teamAName}</h2>
       ${m.teamAScore !== undefined
         ? `<div class="runs">${m.teamAScore}/${m.teamAWkts}</div><div class="overs">${m.teamAOvers} Overs</div>`
         : `<div style="opacity:0.5;font-size:14px">Yet to bat</div>`}
     </div>
     <div style="font-size:18px;align-self:center;opacity:0.4">vs</div>
     <div class="team-score" style="text-align:right">
-      <h2>${m.teamBName} ${m.teamBLogo || ''}</h2>
+      <h2>${m.teamBName} ${renderLogoHtml(m.teamBLogo, '18px')}</h2>
       ${m.teamBScore !== undefined
         ? `<div class="runs">${m.teamBScore}/${m.teamBWkts}</div><div class="overs">${m.teamBOvers} Overs</div>`
         : `<div style="opacity:0.5;font-size:14px">Yet to bat</div>`}
@@ -492,7 +526,10 @@ function Scoreboard({ data, onMatchEnd }) {
             <div style={{ fontSize: '12px', fontWeight: 700, opacity: 0.7 }}>{data.groundName}</div>
             <button onClick={() => setTab('score')} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>← Back</button>
           </div>
-          <div style={{ fontSize: '14px', fontWeight: 700, opacity: 0.8 }}>{data.battingTeam} Innings</div>
+          <div style={{ fontSize: '14px', fontWeight: 700, opacity: 0.8, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {renderLogo(data.battingTeam === data.teamA.name ? data.teamA.logo : data.teamB.logo, '24px')}
+            {data.battingTeam} Innings
+          </div>
           <div style={{ fontSize: '40px', fontWeight: 900, letterSpacing: '-2px' }}>{totalScore}/{wkts}</div>
           <div style={{ fontSize: '14px', opacity: 0.7 }}>{overs}.{ballsThisOver} Overs • Extras: {totalExtras}</div>
         </div>
@@ -562,7 +599,10 @@ function Scoreboard({ data, onMatchEnd }) {
       <div style={{ background: '#1e3a8a', color: 'white', padding: '36px 20px 20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '16px' }}>
           <div>
-            <div style={{ fontSize: '11px', fontWeight: 700, opacity: 0.6, textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '4px' }}>{battingTeamLogo} {activeBattingTeam}</div>
+            <div style={{ fontSize: '11px', fontWeight: 700, opacity: 0.6, textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {renderLogo(battingTeamLogo, '18px')}
+              {activeBattingTeam}
+            </div>
             <div style={{ fontSize: '52px', fontWeight: 900, lineHeight: 1, letterSpacing: '-3px' }}>{totalScore}<span style={{ color: '#60a5fa', margin: '0 4px' }}>/</span>{wkts}</div>
           </div>
           <div style={{ textAlign: 'right' }}>
@@ -671,12 +711,28 @@ function Scoreboard({ data, onMatchEnd }) {
           {wkType && NEEDS_FIELDER.includes(wkType) && (
             <div style={{ marginBottom: '12px' }}>
               <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '6px' }}>{wkType === 'Caught' ? 'Caught by' : wkType === 'Stumped' ? 'Stumped by' : 'Run Out by'}</div>
-              <input value={fielder} onChange={e => setFielder(e.target.value)} placeholder="Fielder name" style={inpSt} />
+              <input 
+                value={fielder} 
+                onChange={e => {
+                  const val = e.target.value;
+                  setFielder(val ? val.charAt(0).toUpperCase() + val.slice(1) : '');
+                }} 
+                placeholder="Fielder name" 
+                style={inpSt} 
+              />
             </div>
           )}
           <div style={{ marginBottom: '16px' }}>
             <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '6px' }}>New Batsman (leave blank to auto-fill)</div>
-            <input value={newBatName} onChange={e => setNewBatName(e.target.value)} placeholder={`Batsman ${wkts + 3}`} style={inpSt} />
+            <input 
+              value={newBatName} 
+              onChange={e => {
+                const val = e.target.value;
+                setNewBatName(val ? val.charAt(0).toUpperCase() + val.slice(1) : '');
+              }} 
+              placeholder={`Batsman ${wkts + 3}`} 
+              style={inpSt} 
+            />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <button onClick={() => setWicketModal(false)} style={{ padding: '16px', borderRadius: '14px', border: '1.5px solid #e2e8f0', background: 'white', fontWeight: 700, fontSize: '14px', cursor: 'pointer' }}>Cancel</button>
@@ -690,7 +746,17 @@ function Scoreboard({ data, onMatchEnd }) {
         <Overlay>
           <div style={{ fontSize: '18px', fontWeight: 800, marginBottom: '4px' }}>Over {overs} Complete!</div>
           <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '16px' }}>Who bowls the next over?</div>
-          <input autoFocus value={newBowlerName} onChange={e => setNewBowlerName(e.target.value)} onKeyDown={e => e.key === 'Enter' && confirmNewBowler()} placeholder={`Bowler ${doneBowlers.length + 2}`} style={{ ...inpSt, marginBottom: '16px' }} />
+          <input 
+            autoFocus 
+            value={newBowlerName} 
+            onChange={e => {
+              const val = e.target.value;
+              setNewBowlerName(val ? val.charAt(0).toUpperCase() + val.slice(1) : '');
+            }} 
+            onKeyDown={e => e.key === 'Enter' && confirmNewBowler()} 
+            placeholder={`Bowler ${doneBowlers.length + 2}`} 
+            style={{ ...inpSt, marginBottom: '16px' }} 
+          />
           <button onClick={confirmNewBowler} style={{ width: '100%', padding: '16px', borderRadius: '14px', border: 'none', background: '#2563eb', color: 'white', fontWeight: 800, fontSize: '16px', cursor: 'pointer' }}>
             Start Over {overs + 1} →
           </button>
@@ -713,16 +779,40 @@ function Scoreboard({ data, onMatchEnd }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
                 <div>
                   <div style={{ fontSize: '10px', fontWeight: 700, color: '#2563eb', marginBottom: '6px' }}>Striker</div>
-                  <input placeholder="Name" value={nextBat1} onChange={e => setNextBat1(e.target.value)} style={inpSt} />
+                  <input 
+                    placeholder="Name" 
+                    value={nextBat1} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      setNextBat1(val ? val.charAt(0).toUpperCase() + val.slice(1) : '');
+                    }} 
+                    style={inpSt} 
+                  />
                 </div>
                 <div>
                   <div style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', marginBottom: '6px' }}>Non-Striker</div>
-                  <input placeholder="Name" value={nextBat2} onChange={e => setNextBat2(e.target.value)} style={inpSt} />
+                  <input 
+                    placeholder="Name" 
+                    value={nextBat2} 
+                    onChange={e => {
+                      const val = e.target.value;
+                      setNextBat2(val ? val.charAt(0).toUpperCase() + val.slice(1) : '');
+                    }} 
+                    style={inpSt} 
+                  />
                 </div>
               </div>
               <div>
                 <div style={{ fontSize: '10px', fontWeight: 700, color: '#8b5cf6', marginBottom: '6px' }}>Opening Bowler ({activeBattingTeam})</div>
-                <input placeholder="Name" value={nextBowler} onChange={e => setNextBowler(e.target.value)} style={inpSt} />
+                <input 
+                  placeholder="Name" 
+                  value={nextBowler} 
+                  onChange={e => {
+                    const val = e.target.value;
+                    setNextBowler(val ? val.charAt(0).toUpperCase() + val.slice(1) : '');
+                  }} 
+                  style={inpSt} 
+                />
               </div>
             </div>
 
@@ -738,9 +828,11 @@ function Scoreboard({ data, onMatchEnd }) {
 
       {/* ── MATCH OVER / END MODAL ── */}
       {matchOverModal && (
-        <Overlay>
-          <div style={{ maxHeight: '80vh', overflowY: 'auto' }}>
-            <div style={{ fontSize: '24px', fontWeight: 900, marginBottom: '4px', textAlign: 'center' }}>Match Over! 🏆</div>
+        <>
+          <Confetti />
+          <Overlay>
+            <div className="win-celebration" style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+              <div style={{ fontSize: '24px', fontWeight: 900, marginBottom: '4px', textAlign: 'center' }}>Match Over! 🏆</div>
             <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '24px', textAlign: 'center' }}>
               {target ? (totalScore >= target ? `${activeBattingTeam} won by ${10 - wkts} wickets` : (isInningsOver ? `${nextBattingTeam} won by ${target - 1 - totalScore} runs` : 'Finalizing...')) : 'Match Summary'}
             </div>
@@ -787,6 +879,7 @@ function Scoreboard({ data, onMatchEnd }) {
             </div>
           </div>
         </Overlay>
+        </>
       )}
 
       {/* ── FLASH CELEBRATION ── */}

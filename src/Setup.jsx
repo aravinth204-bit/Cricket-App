@@ -2,10 +2,19 @@ import { useState, useEffect } from 'react';
 import { printScorecard } from './Scoreboard';
 
 const TEAM_LOGOS = {
-  Lion: '🦁', Dragon: '🐉', Eagle: '🦅', Tiger: '🐯',
-  Shark: '🦈', Wolf: '🐺', Bull: '🐂', Phoenix: '🔥'
+  Lion: '/lion face.png', 
+  Dragon: '/dragon.png', 
+  Tiger: '/tiger.png',
 };
 const logoKeys = Object.keys(TEAM_LOGOS);
+
+const renderLogo = (logo, size = '40px') => {
+  if (!logo) return '🏏';
+  if (typeof logo === 'string' && (logo.endsWith('.png') || logo.startsWith('/'))) {
+    return <img src={logo} alt="logo" style={{ width: size, height: size, objectFit: 'contain' }} />;
+  }
+  return <span style={{ fontSize: size }}>{logo}</span>;
+};
 
 function Setup({ onSetupComplete }) {
   const [teamA, setTeamA] = useState({ name: '', logo: '' });
@@ -75,12 +84,15 @@ function Setup({ onSetupComplete }) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', background: '#f8fafc' }}>
         <div style={{ background: 'white', borderRadius: '24px', padding: '32px', width: '100%', maxWidth: '340px', boxShadow: '0 20px 40px rgba(0,0,0,0.08)' }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 800, marginBottom: '8px' }}>Enter Team {isEditing} Name</h2>
+          <h2 style={{ fontSize: '18px', fontWeight: 800, marginBottom: '8px' }}>Enter {isEditing === 'A' ? 'My Team' : 'Opponent'} Name</h2>
           <p style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '20px' }}>A random mascot logo will be assigned automatically</p>
           <input
             autoFocus
             value={tempName}
-            onChange={(e) => setTempName(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setTempName(val ? val.charAt(0).toUpperCase() + val.slice(1) : '');
+            }}
             onKeyDown={(e) => e.key === 'Enter' && saveTeamName()}
             placeholder="e.g. Active 11s"
             style={{
@@ -145,10 +157,10 @@ function Setup({ onSetupComplete }) {
         {/* Team A — LEFT */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
           <div style={circleStyle(!!teamA.name)} onClick={() => handleCircleClick('A')}>
-            {teamA.logo || '🏏'}
+            {renderLogo(teamA.logo, '40px')}
           </div>
           <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', maxWidth: '90px', textAlign: 'center', color: teamA.name ? '#2563eb' : '#94a3b8' }}>
-            {teamA.name || 'Team A'}
+            {teamA.name || 'My Team'}
           </span>
         </div>
 
@@ -170,10 +182,10 @@ function Setup({ onSetupComplete }) {
         {/* Team B — RIGHT */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
           <div style={circleStyle(!!teamB.name)} onClick={() => handleCircleClick('B')}>
-            {teamB.logo || '🏏'}
+            {renderLogo(teamB.logo, '40px')}
           </div>
           <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px', maxWidth: '90px', textAlign: 'center', color: teamB.name ? '#2563eb' : '#94a3b8' }}>
-            {teamB.name || 'Team B'}
+            {teamB.name || 'Opponent'}
           </span>
         </div>
       </div>
@@ -187,7 +199,10 @@ function Setup({ onSetupComplete }) {
           <input
             placeholder="Where is the match?"
             value={venue}
-            onChange={(e) => setVenue(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setVenue(val ? val.charAt(0).toUpperCase() + val.slice(1) : '');
+            }}
             style={{
               width: '100%', background: '#f8fafc', border: '1.5px solid #e2e8f0',
               borderRadius: '12px', padding: '14px', fontSize: '16px',
@@ -242,8 +257,8 @@ function Setup({ onSetupComplete }) {
               style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '14px', fontSize: '14px', outline: 'none' }}
             >
               <option value="">Winner</option>
-              <option value="A">{teamA.name || 'Team A'}</option>
-              <option value="B">{teamB.name || 'Team B'}</option>
+              <option value="A">{teamA.name || 'My Team'}</option>
+              <option value="B">{teamB.name || 'Opponent'}</option>
             </select>
             <select
               value={tossChoice}
@@ -317,7 +332,7 @@ function Setup({ onSetupComplete }) {
                   {/* Team Scores */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '28px' }}>{m.teamALogo}</span>
+                      {renderLogo(m.teamALogo, '28px')}
                       <div>
                         <div style={{ fontSize: '12px', fontWeight: 800 }}>{m.teamAName}</div>
                         <div style={{ fontSize: '18px', fontWeight: 900, color: '#2563eb', letterSpacing: '-1px' }}>
@@ -335,7 +350,7 @@ function Setup({ onSetupComplete }) {
                         </div>
                         {m.teamBOvers && <div style={{ fontSize: '10px', color: '#94a3b8' }}>{m.teamBOvers} Ov</div>}
                       </div>
-                      <span style={{ fontSize: '28px' }}>{m.teamBLogo}</span>
+                      {renderLogo(m.teamBLogo, '28px')}
                     </div>
                   </div>
 

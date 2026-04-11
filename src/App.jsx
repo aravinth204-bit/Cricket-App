@@ -191,7 +191,7 @@ function App() {
   };
 
   return (
-    <>
+    <div className="screen-fade-in">
       {screen === 'splash' && <SplashScreen />}
       {screen === 'setup' && (
         <div style={{ position: 'relative' }}>
@@ -225,7 +225,7 @@ function App() {
       {screen === 'scoreboard' && (
         <Scoreboard data={matchData} onUpdateMatchData={handleUpdate} onMatchEnd={handleMatchEnd} />
       )}
-    </>
+    </div>
   );
 }
 
