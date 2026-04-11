@@ -154,10 +154,6 @@ export function printScorecard(m) {
 
 // ── Scoreboard ────────────────────────────────────────────────────────────────
 function Scoreboard({ data, onMatchEnd }) {
-  if (!data || !data.batsmen) {
-    return <div style={{ padding: '40px', textAlign: 'center' }}>Loading match data...</div>;
-  }
-
   const [totalScore, setTotalScore] = useLiveState('totalScore', 0);
   const [wkts, setWkts] = useLiveState('wkts', 0);
   const [legalBalls, setLegalBalls] = useLiveState('legalBalls', 0);
