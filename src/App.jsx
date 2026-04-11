@@ -4,15 +4,26 @@ import Scoreboard from './Scoreboard';
 
 function SplashScreen() {
   return (
-    <div style={{
-      height: '100vh', display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center', background: 'white'
-    }}>
-      <div style={{ fontFamily: 'Syncopate, sans-serif', fontSize: '28px', fontWeight: 700, color: '#2563eb', letterSpacing: '-1px' }}>
-        ACTIVE <span style={{ color: '#0f172a' }}>11'S</span>
+    <div className="splash-container">
+      {/* Animated pulse rings + ball */}
+      <div className="splash-ball-wrap">
+        <div className="splash-pulse" />
+        <div className="splash-pulse" />
+        <div className="splash-ball">🏏</div>
       </div>
-      <div style={{ width: '140px', height: '4px', background: '#f1f5f9', borderRadius: '2px', marginTop: '20px', overflow: 'hidden' }}>
-        <div style={{ height: '100%', background: '#2563eb', animation: 'load 2s ease-in-out forwards', width: '0%' }} className="loader-progress" />
+
+      {/* Brand name */}
+      <div className="splash-brand">
+        <span className="splash-active">ACTIVE</span>
+        <span className="splash-11s">11'S</span>
+      </div>
+
+      {/* Tagline */}
+      <div className="splash-tag">Cricket Scoring · Live</div>
+
+      {/* Shimmer progress bar */}
+      <div className="splash-bar-wrap">
+        <div className="splash-bar-fill" />
       </div>
     </div>
   );
