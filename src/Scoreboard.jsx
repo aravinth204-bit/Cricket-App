@@ -146,16 +146,32 @@ function Scoreboard({ data, onMatchEnd }) {
   const [newBatName, setNewBatName] = useState('');
   const [bowlerModal, setBowlerModal] = useState(false);
   const [newBowlerName, setNewBowlerName] = useState('');
-  const [endModal, setEndModal] = useState(false);
+  const [tab, setTab] = useState('score');
   const [potm, setPotm] = useState('');
   const [bestBowlerAward, setBestBowlerAward] = useState('');
-  const [tab, setTab] = useState('score');
+  const [activeBattingTeam, setActiveBattingTeam] = useState(data.battingTeam);
+  
+  // ── Innings Management ───────────────────────────────────────────────────
+  const [innings, setInnings] = useState(1);
+  const [target, setTarget] = useState(null);
+  const [innings1Data, setInnings1Data] = useState(null);
+  const [inningsCompleteModal, setInningsCompleteModal] = useState(false);
+  const [matchOverModal, setMatchOverModal] = useState(false);
+
+  const [nextBat1, setNextBat1] = useState('');
+  const [nextBat2, setNextBat2] = useState('');
+  const [nextBowler, setNextBowler] = useState('');
 
   const overs = Math.floor(legalBalls / 6);
   const ballsThisOver = legalBalls % 6;
   const totalExtras = extrasState.wides + extrasState.noBalls + extrasState.byes + extrasState.legByes;
   const totalOvers = data.totalOvers || 20;
-  const battingTeamLogo = data.battingTeam === data.teamA.name ? data.teamA.logo : data.teamB.logo;
+
+  const isInningsOver = legalBalls >= totalOvers * 6 || wkts >= 10;
+  const isTargetReached = target !== null && totalScore >= target;
+
+  const nextBattingTeam = activeBattingTeam === data.teamA.name ? data.teamB.name : data.teamA.name;
+  const battingTeamLogo = activeBattingTeam === data.teamA.name ? data.teamA.logo : data.teamB.logo;
 
   // ── Core ball commit ───────────────────────────────────────────────────────
   const commitLegal = ({ batsmanRuns = 0, creditBatsman = true, label = '•' }) => {
@@ -174,6 +190,16 @@ function Scoreboard({ data, onMatchEnd }) {
     const newBowler = { ...bowler, balls: bowler.balls + 1, runs: bowler.runs + batsmanRuns };
     setBowler(newBowler);
     const newCurrOver = [...currOver, label];
+    const newScore = totalScore + batsmanRuns;
+
+    if (innings === 2 && target && newScore >= target) {
+      setCurrOver(newCurrOver);
+      setTotalScore(newScore);
+      setLegalBalls(newLB);
+      setMatchOverModal(true);
+      return;
+    }
+
     if (newBTO === 0) {
       setOverHistory(h => [...h, newCurrOver]);
       setCurrOver([]);
@@ -181,8 +207,15 @@ function Scoreboard({ data, onMatchEnd }) {
       let ns = 1 - striker;
       if (batsmanRuns % 2 === 1) ns = striker;
       setStriker(ns);
-      setDoneBowlers(db => [...db, { ...newBowler, overs: Math.floor(newLB / 6) }]);
-      setBowlerModal(true);
+      const updatedDoneBowlers = [...doneBowlers, { ...newBowler, overs: Math.floor(newLB / 6) }];
+      setDoneBowlers(updatedDoneBowlers);
+      
+      if (newLB >= totalOvers * 6) {
+        if (innings === 1) setInningsCompleteModal(true);
+        else setMatchOverModal(true);
+      } else {
+        setBowlerModal(true);
+      }
     } else {
       setCurrOver(newCurrOver);
       setLegalBalls(newLB);
@@ -194,7 +227,13 @@ function Scoreboard({ data, onMatchEnd }) {
 
   const handleWide = () => {
     takeSnap();
-    setTotalScore(sc => sc + 1);
+    setTotalScore(sc => {
+      const newScore = sc + 1;
+      if (innings === 2 && target && newScore >= target) {
+        setMatchOverModal(true);
+      }
+      return newScore;
+    });
     setExtrasState(e => ({ ...e, wides: e.wides + 1 }));
     setBowler(b => ({ ...b, runs: b.runs + 1 }));
     setCurrOver(co => [...co, 'Wd']);
@@ -203,7 +242,13 @@ function Scoreboard({ data, onMatchEnd }) {
   const handleNoBall = (batsmanRuns = 0) => {
     takeSnap();
     const total = 1 + batsmanRuns;
-    setTotalScore(sc => sc + total);
+    setTotalScore(sc => {
+      const newScore = sc + total;
+      if (innings === 2 && target && newScore >= target) {
+        setMatchOverModal(true);
+      }
+      return newScore;
+    });
     setExtrasState(e => ({ ...e, noBalls: e.noBalls + 1 }));
     setBowler(b => ({ ...b, runs: b.runs + total }));
     if (batsmanRuns > 0) {
@@ -240,19 +285,67 @@ function Scoreboard({ data, onMatchEnd }) {
     const bowlerWkt = !['Run Out', 'Handled Ball', 'Retired'].includes(wkType);
     const newBowler = { ...bowler, balls: bowler.balls + 1, wkts: bowler.wkts + (bowlerWkt ? 1 : 0) };
     setBowler(newBowler);
-    setBatsmen(bm => bm.map((b, i) => i === striker ? { name: newBatName.trim() || `Batsman ${wkts + 3}`, runs: 0, balls: 0, fours: 0, sixes: 0 } : b));
-    const newCurrOver = [...currOver, 'W'];
-    setLegalBalls(newLB);
-    setWicketModal(false);
-    if (newBTO === 0) {
-      setOverHistory(h => [...h, newCurrOver]);
+    
+    const newWktsCount = wkts + 1;
+    const isAllOut = newWktsCount >= 10;
+
+    if (newBTO === 0 || isAllOut) {
+      const finalOver = [...currOver, 'W'];
+      setOverHistory(h => [...h, finalOver]);
       setCurrOver([]);
-      setStriker(s => 1 - s);
-      setDoneBowlers(db => [...db, { ...newBowler, overs: Math.floor(newLB / 6) }]);
-      setBowlerModal(true);
+      setLegalBalls(newLB);
+      setWicketModal(false);
+      
+      if (isAllOut || newLB >= totalOvers * 6) {
+        if (innings === 1) setInningsCompleteModal(true);
+        else setMatchOverModal(true);
+      } else {
+        setStriker(s => 1 - s);
+        setBatsmen(bm => bm.map((b, i) => i === striker ? { name: newBatName.trim() || `Batsman ${newWktsCount + 2}`, runs: 0, balls: 0, fours: 0, sixes: 0 } : b));
+        setDoneBowlers(db => [...db, { ...newBowler, overs: Math.floor(newLB / 6) }]);
+        setBowlerModal(true);
+      }
     } else {
-      setCurrOver(newCurrOver);
+      setBatsmen(bm => bm.map((b, i) => i === striker ? { name: newBatName.trim() || `Batsman ${newWktsCount + 2}`, runs: 0, balls: 0, fours: 0, sixes: 0 } : b));
+      setCurrOver(co => [...co, 'W']);
+      setLegalBalls(newLB);
+      setWicketModal(false);
     }
+  };
+
+  const startSecondInnings = () => {
+    // Save 1st Innings Data
+    const i1Summary = {
+      score: totalScore,
+      wkts: wkts,
+      overs: `${overs}.${ballsThisOver}`,
+      extras: { ...extrasState },
+      batsmen: [...dismissed.map(b => ({ ...b, status: b.how })), ...batsmen.map((b, i) => ({ ...b, status: i === striker ? 'not out *' : 'not out' }))],
+      bowlers: [...doneBowlers, { ...bowler, overs: `${Math.floor(bowler.balls / 6)}.${bowler.balls % 6}` }]
+    };
+    setInnings1Data(i1Summary);
+    setTarget(totalScore + 1);
+    setInnings(2);
+    setActiveBattingTeam(nextBattingTeam);
+
+    // Reset Scoring State
+    setTotalScore(0);
+    setWkts(0);
+    setLegalBalls(0);
+    setExtrasState({ wides: 0, noBalls: 0, byes: 0, legByes: 0 });
+    setBatsmen([
+      { name: nextBat1 || 'Striker 1', runs: 0, balls: 0, fours: 0, sixes: 0 },
+      { name: nextBat2 || 'Non-Striker 2', runs: 0, balls: 0, fours: 0, sixes: 0 },
+    ]);
+    setStriker(0);
+    setDismissed([]);
+    setBowler({ name: nextBowler || 'Opening Bowler', balls: 0, runs: 0, wkts: 0 });
+    setDoneBowlers([]);
+    setOverHistory([]);
+    setCurrOver([]);
+    setSnapHistory([]);
+    
+    setInningsCompleteModal(false);
   };
 
   const confirmNewBowler = () => {
@@ -262,27 +355,37 @@ function Scoreboard({ data, onMatchEnd }) {
   };
 
   const saveAndEnd = () => {
-    const isTeamABatting = data.battingTeam === data.teamA.name;
     const allBowlersList = [...doneBowlers, { ...bowler, overs: Math.floor(bowler.balls / 6) }];
+    
+    const currentBattingScorecard = [
+      ...dismissed.map(b => ({ ...b, status: b.how })),
+      ...batsmen.map((b, i) => ({ ...b, status: i === striker ? 'not out *' : 'not out' }))
+    ];
+
+    const isTeamABatting = activeBattingTeam === data.teamA.name;
+
     const summary = {
       ground: data.groundName,
       date: new Date().toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
       teamAName: data.teamA.name, teamALogo: data.teamA.logo,
-      teamAScore: isTeamABatting ? totalScore : undefined,
-      teamAWkts: isTeamABatting ? wkts : undefined,
-      teamAOvers: isTeamABatting ? `${overs}.${ballsThisOver}` : undefined,
       teamBName: data.teamB.name, teamBLogo: data.teamB.logo,
-      teamBScore: !isTeamABatting ? totalScore : undefined,
-      teamBWkts: !isTeamABatting ? wkts : undefined,
-      teamBOvers: !isTeamABatting ? `${overs}.${ballsThisOver}` : undefined,
+      
+      teamAScore: isTeamABatting ? totalScore : (innings1Data ? (innings === 2 ? innings1Data.score : undefined) : undefined),
+      teamAWkts: isTeamABatting ? wkts : (innings1Data ? (innings === 2 ? innings1Data.wkts : undefined) : undefined),
+      teamAOvers: isTeamABatting ? `${overs}.${ballsThisOver}` : (innings1Data ? (innings === 2 ? innings1Data.overs : undefined) : undefined),
+      
+      teamBScore: !isTeamABatting ? totalScore : (innings1Data ? (innings === 2 ? innings1Data.score : undefined) : undefined),
+      teamBWkts: !isTeamABatting ? wkts : (innings1Data ? (innings === 2 ? innings1Data.wkts : undefined) : undefined),
+      teamBOvers: !isTeamABatting ? `${overs}.${ballsThisOver}` : (innings1Data ? (innings === 2 ? innings1Data.overs : undefined) : undefined),
+      
       potm, bestBowler: bestBowlerAward,
-      battingTeam: data.battingTeam, totalOvers: data.totalOvers,
+      battingTeam: activeBattingTeam, 
+      totalOvers: data.totalOvers,
       extras: extrasState,
-      battingScorecard: [
-        ...dismissed.map(b => ({ ...b, status: b.how })),
-        ...batsmen.map((b, i) => ({ ...b, status: i === striker ? 'not out *' : 'not out' }))
-      ],
-      bowlingScorecard: allBowlersList.map(b => ({ name: b.name, overs: `${Math.floor(b.balls / 6)}.${b.balls % 6}`, runs: b.runs, wkts: b.wkts }))
+      battingScorecard: currentBattingScorecard,
+      bowlingScorecard: allBowlersList.map(b => ({ name: b.name, overs: `${Math.floor(b.balls / 6)}.${b.balls % 6}`, runs: b.runs, wkts: b.wkts })),
+      
+      result: target ? (totalScore >= target ? `${activeBattingTeam} won by ${10 - wkts} wickets` : (isInningsOver ? `${activeBattingTeam === data.teamA.name ? data.teamB.name : data.teamA.name} won by ${target - 1 - totalScore} runs` : 'Match tied')) : undefined
     };
     if (onMatchEnd) onMatchEnd(summary);
   };
@@ -394,15 +497,16 @@ function Scoreboard({ data, onMatchEnd }) {
       <div style={{ background: '#1e3a8a', color: 'white', padding: '36px 20px 20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '16px' }}>
           <div>
-            <div style={{ fontSize: '11px', fontWeight: 700, opacity: 0.6, textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '4px' }}>{battingTeamLogo} {data.battingTeam}</div>
+            <div style={{ fontSize: '11px', fontWeight: 700, opacity: 0.6, textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '4px' }}>{battingTeamLogo} {activeBattingTeam}</div>
             <div style={{ fontSize: '52px', fontWeight: 900, lineHeight: 1, letterSpacing: '-3px' }}>{totalScore}<span style={{ color: '#60a5fa', margin: '0 4px' }}>/</span>{wkts}</div>
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: '26px', fontWeight: 800 }}>{overs}.{ballsThisOver}</div>
             <div style={{ fontSize: '10px', opacity: 0.5, textTransform: 'uppercase' }}>/ {totalOvers} Overs</div>
+            {target && <div style={{ fontSize: '12px', color: '#60a5fa', fontWeight: 700, marginTop: '4px' }}>Target: {target}</div>}
             <div style={{ display: 'flex', gap: '6px', marginTop: '8px', justifyContent: 'flex-end' }}>
               <button onClick={() => setTab('card')} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', padding: '5px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>Scorecard</button>
-              <button onClick={() => setEndModal(true)} style={{ background: 'rgba(239,68,68,0.3)', border: '1px solid rgba(239,68,68,0.5)', color: 'white', padding: '5px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>End Match</button>
+              <button onClick={() => setMatchOverModal(true)} style={{ background: 'rgba(239,68,68,0.3)', border: '1px solid rgba(239,68,68,0.5)', color: 'white', padding: '5px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>End Match</button>
             </div>
           </div>
         </div>
@@ -528,61 +632,93 @@ function Scoreboard({ data, onMatchEnd }) {
         </Overlay>
       )}
 
-      {/* ── END MATCH MODAL ── */}
-      {endModal && (
+      {/* ── INNINGS COMPLETE MODAL ── */}
+      {inningsCompleteModal && (
         <Overlay>
-          <div style={{ maxHeight: '80vh', overflowY: 'auto' }}>
-            <div style={{ fontSize: '20px', fontWeight: 800, marginBottom: '4px' }}>End Match 🏆</div>
-            <div style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '18px' }}>Pick the awards before saving</div>
-
-            {/* Score preview */}
-            <div style={{ background: '#f8fafc', borderRadius: '14px', padding: '14px', marginBottom: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '24px' }}>{data.teamA.logo}</span>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '24px', fontWeight: 900, color: '#2563eb', marginBottom: '8px' }}>Innings Complete!</div>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', marginBottom: '24px' }}>
+              {activeBattingTeam} scored {totalScore}/{wkts} in {overs}.{ballsThisOver} overs
+            </div>
+            
+            <div style={{ background: '#f8fafc', borderRadius: '20px', padding: '20px', marginBottom: '24px', textAlign: 'left' }}>
+              <div style={{ fontSize: '12px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>
+                Next Innings Setup — {nextBattingTeam}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
                 <div>
-                  <div style={{ fontSize: '11px', fontWeight: 700 }}>{data.teamA.name}</div>
-                  {data.battingTeam === data.teamA.name
-                    ? <div style={{ fontSize: '20px', fontWeight: 900, color: '#2563eb' }}>{totalScore}/{wkts}</div>
-                    : <div style={{ fontSize: '12px', color: '#94a3b8' }}>Yet to bat</div>}
+                  <div style={{ fontSize: '10px', fontWeight: 700, color: '#2563eb', marginBottom: '6px' }}>Striker</div>
+                  <input placeholder="Name" value={nextBat1} onChange={e => setNextBat1(e.target.value)} style={inpSt} />
+                </div>
+                <div>
+                  <div style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', marginBottom: '6px' }}>Non-Striker</div>
+                  <input placeholder="Name" value={nextBat2} onChange={e => setNextBat2(e.target.value)} style={inpSt} />
                 </div>
               </div>
-              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 700 }}>vs</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700 }}>{data.teamB.name}</div>
-                  {data.battingTeam === data.teamB.name
-                    ? <div style={{ fontSize: '20px', fontWeight: 900, color: '#2563eb' }}>{totalScore}/{wkts}</div>
-                    : <div style={{ fontSize: '12px', color: '#94a3b8' }}>Yet to bat</div>}
-                </div>
-                <span style={{ fontSize: '24px' }}>{data.teamB.logo}</span>
+              <div>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: '#8b5cf6', marginBottom: '6px' }}>Opening Bowler ({activeBattingTeam})</div>
+                <input placeholder="Name" value={nextBowler} onChange={e => setNextBowler(e.target.value)} style={inpSt} />
               </div>
-            </div>
-
-            {/* POTM */}
-            <div style={{ marginBottom: '18px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>🏆 Player of the Match</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
-                {[...dismissed.map(b => b.name), ...batsmen.map(b => b.name)].map((name, i) => (
-                  <button key={i} onClick={() => setPotm(name)} style={{ padding: '8px 14px', borderRadius: '20px', border: '1.5px solid', borderColor: potm === name ? '#f59e0b' : '#e2e8f0', background: potm === name ? '#fffbeb' : 'white', color: potm === name ? '#b45309' : '#475569', fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}>{name}</button>
-                ))}
-              </div>
-              <input placeholder="Or type a custom name..." value={potm} onChange={e => setPotm(e.target.value)} style={{ width: '100%', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '10px 14px', fontSize: '14px', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }} />
-            </div>
-
-            {/* Best Bowler */}
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 800, color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>🎳 Best Bowler</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
-                {[...doneBowlers.map(b => b.name), bowler.name].map((name, i) => (
-                  <button key={i} onClick={() => setBestBowlerAward(name)} style={{ padding: '8px 14px', borderRadius: '20px', border: '1.5px solid', borderColor: bestBowlerAward === name ? '#8b5cf6' : '#e2e8f0', background: bestBowlerAward === name ? '#f5f3ff' : 'white', color: bestBowlerAward === name ? '#7c3aed' : '#475569', fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}>{name}</button>
-                ))}
-              </div>
-              <input placeholder="Or type a custom name..." value={bestBowlerAward} onChange={e => setBestBowlerAward(e.target.value)} style={{ width: '100%', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '10px 14px', fontSize: '14px', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }} />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <button onClick={() => setEndModal(false)} style={{ padding: '16px', borderRadius: '14px', border: '1.5px solid #e2e8f0', background: 'white', fontWeight: 700, fontSize: '15px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
-              <button onClick={saveAndEnd} style={{ padding: '16px', borderRadius: '14px', border: 'none', background: '#2563eb', color: 'white', fontWeight: 800, fontSize: '15px', cursor: 'pointer', fontFamily: 'inherit' }}>Save & Exit</button>
+              <button onClick={() => setMatchOverModal(true)} style={{ padding: '16px', borderRadius: '16px', border: '1.5px solid #e2e8f0', background: 'white', fontWeight: 700, fontSize: '15px' }}>End Match</button>
+              <button onClick={startSecondInnings} style={{ padding: '16px', borderRadius: '16px', border: 'none', background: '#2563eb', color: 'white', fontWeight: 800, fontSize: '15px' }}>
+                Start 2nd Innings →
+              </button>
+            </div>
+          </div>
+        </Overlay>
+      )}
+
+      {/* ── MATCH OVER / END MODAL ── */}
+      {matchOverModal && (
+        <Overlay>
+          <div style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+            <div style={{ fontSize: '24px', fontWeight: 900, marginBottom: '4px', textAlign: 'center' }}>Match Over! 🏆</div>
+            <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '24px', textAlign: 'center' }}>
+              {target ? (totalScore >= target ? `${activeBattingTeam} won by ${10 - wkts} wickets` : (isInningsOver ? `${nextBattingTeam} won by ${target - 1 - totalScore} runs` : 'Finalizing...')) : 'Match Summary'}
+            </div>
+
+            {/* Score comparison */}
+            <div style={{ background: '#f8fafc', borderRadius: '20px', padding: '20px', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '32px' }}>{data.teamA.logo}</span>
+                  <div>
+                    <div style={{ fontSize: '12px', fontWeight: 700 }}>{data.teamA.name}</div>
+                    <div style={{ fontSize: '24px', fontWeight: 900, color: '#2563eb' }}>
+                      {activeBattingTeam === data.teamA.name ? `${totalScore}/${wkts}` : (innings1Data ? `${innings1Data.score}/${innings1Data.wkts}` : '—')}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ fontSize: '12px', fontWeight: 800, color: '#cbd5e1' }}>VS</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', textAlign: 'right' }}>
+                  <div>
+                    <div style={{ fontSize: '12px', fontWeight: 700 }}>{data.teamB.name}</div>
+                    <div style={{ fontSize: '24px', fontWeight: 900, color: '#f59e0b' }}>
+                      {activeBattingTeam === data.teamB.name ? `${totalScore}/${wkts}` : (innings1Data ? `${innings1Data.score}/${innings1Data.wkts}` : '—')}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '32px' }}>{data.teamB.logo}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Awards */}
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ fontSize: '10px', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>🏆 Player of the Match</div>
+              <input placeholder="Type name..." value={potm} onChange={e => setPotm(e.target.value)} style={inpSt} />
+            </div>
+
+            <div style={{ marginBottom: '24px' }}>
+              <div style={{ fontSize: '10px', fontWeight: 800, color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>🎳 Best Bowler</div>
+              <input placeholder="Type name..." value={bestBowlerAward} onChange={e => setBestBowlerAward(e.target.value)} style={inpSt} />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <button onClick={() => setMatchOverModal(false)} style={{ padding: '16px', borderRadius: '16px', border: '1.5px solid #e2e8f0', background: 'white', fontWeight: 700, fontSize: '15px' }}>Cancel</button>
+              <button onClick={saveAndEnd} style={{ padding: '16px', borderRadius: '16px', border: 'none', background: '#2563eb', color: 'white', fontWeight: 800, fontSize: '15px' }}>Save & Exit</button>
             </div>
           </div>
         </Overlay>
