@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Setup from './Setup';
 import Scoreboard from './Scoreboard';
+import WeeklySeries from './WeeklySeries';
 
 function SplashScreen() {
   return (
@@ -142,6 +143,9 @@ function saveMatchSummary(summary) {
 function App() {
   const [screen, setScreen] = useState('splash');
   const [matchData, setMatchData] = useState(null);
+  const [matchHistory, setMatchHistory] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('active11s_history') || '[]'); } catch { return []; }
+  });
 
   useEffect(() => {
     const timer = setTimeout(() => setScreen('setup'), 2000);
@@ -163,13 +167,45 @@ function App() {
   const handleMatchEnd = (summary) => {
     saveMatchSummary(summary);
     setMatchData(null);
+    // Refresh match history
+    try {
+      const updated = JSON.parse(localStorage.getItem('active11s_history') || '[]');
+      setMatchHistory(updated);
+    } catch {}
     setScreen('setup');
   };
 
   return (
     <>
       {screen === 'splash' && <SplashScreen />}
-      {screen === 'setup' && <Setup onSetupComplete={handleSetupComplete} />}
+      {screen === 'setup' && (
+        <div style={{ position: 'relative' }}>
+          <Setup onSetupComplete={handleSetupComplete} />
+          {/* Sunday Series floating button */}
+          <button
+            onClick={() => setScreen('weekly')}
+            style={{
+              position: 'fixed', bottom: '24px', right: '20px', left: '20px',
+              background: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
+              color: 'white', border: 'none', borderRadius: '18px',
+              padding: '16px 20px', fontSize: '14px', fontWeight: 800,
+              cursor: 'pointer', boxShadow: '0 8px 28px rgba(37,99,235,0.4)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+              fontFamily: 'inherit', letterSpacing: '0.5px', zIndex: 50
+            }}
+          >
+            <span style={{ fontSize: '20px' }}>🗓️</span>
+            SUNDAY SERIES TRACKER
+            <span style={{
+              background: 'rgba(255,255,255,0.2)', borderRadius: '8px',
+              padding: '2px 8px', fontSize: '11px'
+            }}>Best of 3</span>
+          </button>
+        </div>
+      )}
+      {screen === 'weekly' && (
+        <WeeklySeries onBack={() => setScreen('setup')} matchHistory={matchHistory} />
+      )}
       {screen === 'players' && <PlayerSelection data={matchData} onStartMatch={handleMatchStart} />}
       {screen === 'scoreboard' && (
         <Scoreboard data={matchData} onUpdateMatchData={handleUpdate} onMatchEnd={handleMatchEnd} />

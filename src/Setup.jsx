@@ -258,7 +258,7 @@ function Setup({ onSetupComplete }) {
             width: '100%', background: '#2563eb', color: 'white', border: 'none',
             borderRadius: '16px', padding: '18px', fontSize: '16px', fontWeight: 800,
             cursor: 'pointer', boxShadow: '0 10px 30px rgba(37,99,235,0.25)',
-            letterSpacing: '1px', marginBottom: '40px'
+            letterSpacing: '1px', marginBottom: '16px'
           }}
         >
             START MATCH
@@ -266,7 +266,7 @@ function Setup({ onSetupComplete }) {
 
         {/* ── Match History Section ── */}
         {matchHistory.length > 0 && (
-          <div style={{ marginBottom: '40px', marginTop: '8px' }}>
+          <div style={{ marginBottom: '100px', marginTop: '8px' }}>
             <div style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '12px', paddingLeft: '4px' }}>
               Past Matches
             </div>
