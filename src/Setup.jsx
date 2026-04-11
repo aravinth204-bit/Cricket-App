@@ -115,10 +115,13 @@ function Setup({ onSetupComplete }) {
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', display: 'flex', flexDirection: 'column' }}>
       {/* Header with live clock */}
-      <div style={{ paddingTop: '50px', paddingBottom: '10px', textAlign: 'center', paddingLeft: '16px', paddingRight: '16px' }}>
-        <h1 style={{ fontFamily: 'Syncopate, sans-serif', fontSize: '22px', fontWeight: 700, letterSpacing: '-1px', color: '#0f172a' }}>
-          MATCH CENTER
-        </h1>
+      <div style={{ paddingTop: '40px', paddingBottom: '10px', textAlign: 'center', paddingLeft: '16px', paddingRight: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '4px' }}>
+          <img src="/active11s_logo.png" alt="Logo" style={{ width: '28px', height: '28px', borderRadius: '8px', objectFit: 'cover', boxShadow: '0 4px 10px rgba(37,99,235,0.2)' }} />
+          <h1 style={{ fontFamily: 'Syncopate, sans-serif', fontSize: '22px', fontWeight: 700, letterSpacing: '-1px', color: '#0f172a', margin: 0 }}>
+            MATCH CENTER
+          </h1>
+        </div>
         <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
           <div style={{ fontSize: '28px', fontWeight: 800, color: '#2563eb', letterSpacing: '-1px', lineHeight: 1 }}>
             {fmtTime(now)}
@@ -195,7 +198,7 @@ function Setup({ onSetupComplete }) {
             Match Format — {totalOvers} Overs
           </label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-            {[{ label: 'T10', overs: 10 }, { label: 'T20', overs: 20 }, { label: 'ODI', overs: 50 }].map(({ label, overs }) => {
+            {[{ label: '8 Overs', overs: 8 }, { label: 'T10', overs: 10 }, { label: 'T20', overs: 20 }].map(({ label, overs }) => {
               const isActive = totalOvers === overs;
               return (
                 <button key={label} onClick={() => setTotalOvers(overs)} style={{

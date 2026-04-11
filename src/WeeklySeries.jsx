@@ -133,14 +133,14 @@ function WeekCard({ week, index, onDelete }) {
           flexShrink: 0
         }}>
           <span style={{ fontSize: '13px', fontWeight: 900, color: weekWinner ? 'white' : '#94a3b8' }}>
-            W{index + 1}
+            S{index + 1}
           </span>
         </div>
 
         {/* Week Info */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a' }}>
-            Sunday, {week.sundayLabel}
+            Started: {week.sundayLabel}
           </div>
           <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>
             {week.teamALogo} {week.teamA} vs {week.teamB} {week.teamBLogo} · {totalPlayed}/3 matches
@@ -195,7 +195,7 @@ function WeekCard({ week, index, onDelete }) {
               <span style={{ fontSize: '24px' }}>🏅</span>
               <div>
                 <div style={{ fontSize: '9px', fontWeight: 800, color: '#b45309', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                  Best Player of the Week
+                  Best Player of the Series
                 </div>
                 <div style={{ fontSize: '16px', fontWeight: 900, color: '#0f172a' }}>{bestPlayer[0]}</div>
                 <div style={{ fontSize: '10px', color: '#92400e' }}>{bestPlayer[1]} POTM award{bestPlayer[1] > 1 ? 's' : ''} this week</div>
@@ -370,10 +370,10 @@ function WeeklySeries({ onBack, matchHistory }) {
           }}>←</button>
           <div>
             <div style={{ fontFamily: 'Syncopate, sans-serif', fontSize: '16px', fontWeight: 700, color: 'white', letterSpacing: '1px' }}>
-              SUNDAY SERIES
+              SERIES TRACKER
             </div>
             <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', fontWeight: 600, letterSpacing: '2px', textTransform: 'uppercase' }}>
-              Best of 3 · Weekly Tracker
+              Best of 3 · Match Tracker
             </div>
           </div>
           <button
@@ -385,7 +385,7 @@ function WeeklySeries({ onBack, matchHistory }) {
               boxShadow: '0 6px 20px rgba(37,99,235,0.4)', letterSpacing: '0.5px'
             }}
           >
-            + NEW WEEK
+            + NEW SERIES
           </button>
         </div>
 
@@ -393,7 +393,7 @@ function WeeklySeries({ onBack, matchHistory }) {
         <div style={{ display: 'flex', gap: '10px', marginTop: '20px', position: 'relative' }}>
           <div style={{ flex: 1, background: 'rgba(255,255,255,0.08)', borderRadius: '14px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', fontWeight: 900, color: 'white' }}>{series.length}</div>
-            <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>Weeks</div>
+            <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.5)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>Series</div>
           </div>
           <div style={{ flex: 1, background: 'rgba(255,255,255,0.08)', borderRadius: '14px', padding: '12px', textAlign: 'center' }}>
             <div style={{ fontSize: '22px', fontWeight: 900, color: 'white' }}>{allCompletedWeeks.length}</div>
@@ -436,10 +436,10 @@ function WeeklySeries({ onBack, matchHistory }) {
             }}>
               <div style={{ fontSize: '48px', marginBottom: '16px' }}>🗓️</div>
               <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>
-                No Sunday Series Yet
+                No Series Yet
               </div>
               <div style={{ fontSize: '13px', color: '#94a3b8' }}>
-                Tap "+ NEW WEEK" to start tracking your Sunday best-of-3 series!
+                Tap "+ NEW SERIES" to start tracking your best-of-3 matchups!
               </div>
             </div>
           ) : (
@@ -605,9 +605,9 @@ function WeeklySeries({ onBack, matchHistory }) {
             background: 'white', borderRadius: '28px 28px 0 0',
             padding: '28px 24px 44px', width: '100%', maxWidth: '480px'
           }}>
-            <div style={{ fontSize: '20px', fontWeight: 900, marginBottom: '6px' }}>🗓️ New Sunday Series</div>
+            <div style={{ fontSize: '20px', fontWeight: 900, marginBottom: '6px' }}>🗓️ New Series</div>
             <div style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '24px' }}>
-              Week of {getCurrentSundayLabel()} · Best of 3
+              Started: {getCurrentSundayLabel()} · Best of 3
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
               <input
@@ -649,7 +649,7 @@ function WeeklySeries({ onBack, matchHistory }) {
                   background: '#2563eb', color: 'white', fontWeight: 800,
                   fontSize: '15px', cursor: 'pointer', fontFamily: 'inherit'
                 }}
-              >Create Week</button>
+              >Create Series</button>
             </div>
           </div>
         </div>

@@ -173,6 +173,50 @@ function Scoreboard({ data, onMatchEnd }) {
   const [innings1Data, setInnings1Data] = useLiveState('in1Data', data.chaseTarget ? { score: parseInt(data.chaseTarget, 10) - 1, wkts: 10, overs: data.totalOvers } : null);
   const [inningsCompleteModal, setInningsCompleteModal] = useLiveState('inningsComp', false);
   const [matchOverModal, setMatchOverModal] = useLiveState('matchOver', false);
+  const [flashMsg, setFlashMsg] = useState(null);
+
+  const showFlash = (text, bg, emojis = []) => {
+    setFlashMsg({ text, bg, emojis });
+    setTimeout(() => {
+      setFlashMsg(m => m?.text === text ? null : m);
+    }, 2000);
+  };
+
+  useEffect(() => {
+    if (matchOverModal && !potm && !bestBowlerAward) {
+      const allBatsmen = [
+        ...(innings1Data ? innings1Data.batsmen : []),
+        ...dismissed,
+        ...batsmen
+      ].filter(b => b && b.name && !b.name.includes('Batsman') && !b.name.includes('Striker') && b.balls > 0);
+
+      const allBowlers = [
+        ...(innings1Data ? innings1Data.bowlers : []),
+        ...doneBowlers,
+        { ...bowler, overs: Math.floor(bowler.balls / 6) }
+      ].filter(b => b && b.name && !b.name.includes('Bowler') && (b.balls > 0 || b.overs > 0));
+
+      let topBat = null, topBatScore = -1;
+      allBatsmen.forEach(b => {
+        const pts = b.runs * 1.5 + b.fours * 1 + b.sixes * 2;
+        if (pts > topBatScore) { topBatScore = pts; topBat = b.name; }
+      });
+
+      let topBowl = null, topBowlScore = -1;
+      allBowlers.forEach(b => {
+        const totalBalls = (typeof b.overs === 'string' ? parseFloat(b.overs) * 6 : (b.overs || 0) * 6) + (b.balls || 0);
+        const overs = totalBalls / 6;
+        const econ = overs > 0 ? b.runs / overs : 0;
+        const pts = (b.wkts * 20) - econ + (b.wkts >= 3 ? 10 : 0);
+        if (pts > topBowlScore) { topBowlScore = pts; topBowl = b.name; }
+      });
+
+      if (topBowl) setBestBowlerAward(topBowl);
+      if (topBatScore > topBowlScore && topBat) setPotm(topBat);
+      else if (topBowl) setPotm(topBowl);
+      else if (topBat) setPotm(topBat);
+    }
+  }, [matchOverModal, innings1Data, dismissed, batsmen, doneBowlers, bowler, potm, bestBowlerAward]);
 
   const [nextBat1, setNextBat1] = useState('');
   const [nextBat2, setNextBat2] = useState('');
@@ -215,6 +259,9 @@ function Scoreboard({ data, onMatchEnd }) {
       setMatchOverModal(true);
       return;
     }
+
+    if (batsmanRuns === 4 && creditBatsman) showFlash('FOUR! ✨', '#3b82f6', ['💥', '🎇', '✨', '🏏', '⚡', '⚡']);
+    if (batsmanRuns === 6 && creditBatsman) showFlash('SIX! 🚀', '#8b5cf6', ['🎆', '🧨', '🎆', '🚀', '🔥', '🔥']);
 
     if (newBTO === 0) {
       setOverHistory(h => [...h, newCurrOver]);
@@ -311,6 +358,7 @@ function Scoreboard({ data, onMatchEnd }) {
       setCurrOver([]);
       setLegalBalls(newLB);
       setWicketModal(false);
+      showFlash('WICKET! 🎯', '#dc2626');
       
       if (isAllOut || newLB >= totalOvers * 6) {
         if (innings === 1) setInningsCompleteModal(true);
@@ -326,6 +374,7 @@ function Scoreboard({ data, onMatchEnd }) {
       setCurrOver(co => [...co, 'W']);
       setLegalBalls(newLB);
       setWicketModal(false);
+      showFlash('WICKET! 🎯', '#dc2626', ['😭', '💔', '☝️', '📉', '🥀']);
     }
   };
 
@@ -738,6 +787,32 @@ function Scoreboard({ data, onMatchEnd }) {
             </div>
           </div>
         </Overlay>
+      )}
+
+      {/* ── FLASH CELEBRATION ── */}
+      {flashMsg && (
+        <div className="flash-message">
+          <div className="flash-content">
+            {flashMsg.emojis.map((emoji, i) => {
+              const angle = (i / flashMsg.emojis.length) * 360;
+              const dist = 150 + Math.random() * 100;
+              const dx = Math.cos(angle * Math.PI / 180) * dist;
+              const dy = Math.sin(angle * Math.PI / 180) * dist;
+              return (
+                <span 
+                  key={i} 
+                  className="flash-emoji-burst" 
+                  style={{ '--dx': `${dx}px`, '--dy': `${dy}px`, '--dr': `${Math.random() * 360}deg` }}
+                >
+                  {emoji}
+                </span>
+              );
+            })}
+            <div style={{ background: flashMsg.bg, padding: '40px 60px', borderRadius: '30px', boxShadow: `0 20px 60px ${flashMsg.bg}80`, zIndex: 10, position: 'relative' }}>
+              <div className="flash-text">{flashMsg.text}</div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

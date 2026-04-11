@@ -10,7 +10,9 @@ function SplashScreen() {
       <div className="splash-ball-wrap">
         <div className="splash-pulse" />
         <div className="splash-pulse" />
-        <div className="splash-ball">🏏</div>
+        <div className="splash-ball" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <img src="/active11s_logo.png" alt="Active 11s Logo" style={{ width: '80px', height: '80px', borderRadius: '20px', boxShadow: '0 10px 25px rgba(37,99,235,0.4)', objectFit: 'cover' }} />
+        </div>
       </div>
 
       {/* Brand name */}
@@ -208,7 +210,7 @@ function App() {
             }}
           >
             <span style={{ fontSize: '20px' }}>🗓️</span>
-            SUNDAY SERIES TRACKER
+            SERIES TRACKER
             <span style={{
               background: 'rgba(255,255,255,0.2)', borderRadius: '8px',
               padding: '2px 8px', fontSize: '11px'

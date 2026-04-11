@@ -269,3 +269,55 @@ body {
   from { transform: scale(0.8); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
+
+/* Flash Celebration Popups */
+.flash-message {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.flash-content {
+  position: relative;
+  animation: flashIn 2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+@keyframes flashIn {
+  0% { transform: scale(0.5) rotate(-10deg); opacity: 0; }
+  15% { transform: scale(1.1) rotate(2deg); opacity: 1; filter: brightness(1.2); }
+  25% { transform: scale(1) rotate(0); opacity: 1; }
+  85% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
+.flash-emoji-burst {
+  position: absolute;
+  font-size: 40px;
+  animation: emojiFloat 1.5s ease-out forwards;
+}
+
+@keyframes emojiFloat {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(2) rotate(var(--dr)); opacity: 0; }
+}
+
+.flash-text {
+  font-family: 'Syncopate', sans-serif;
+  font-size: 72px;
+  font-weight: 900;
+  color: white;
+  text-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  letter-spacing: -2px;
+  text-align: center;
+  line-height: 1.1;
+  text-transform: uppercase;
+  z-index: 10;
+}
