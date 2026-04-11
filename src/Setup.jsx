@@ -18,6 +18,7 @@ function Setup({ onSetupComplete }) {
   const [tossChoice, setTossChoice] = useState('');
   const [isEditing, setIsEditing] = useState(null);
   const [tempName, setTempName] = useState('');
+  const [chaseTarget, setChaseTarget] = useState('');
   const [now, setNow] = useState(new Date());
   const [matchHistory, setMatchHistory] = useState([]);
 
@@ -64,7 +65,8 @@ function Setup({ onSetupComplete }) {
       tossWinner,
       tossChoice,
       battingTeam,
-      totalOvers
+      totalOvers,
+      chaseTarget
     });
   };
 
@@ -80,7 +82,7 @@ function Setup({ onSetupComplete }) {
             value={tempName}
             onChange={(e) => setTempName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && saveTeamName()}
-            placeholder="e.g. Chennai Kings"
+            placeholder="e.g. Active 11s"
             style={{
               width: '100%', background: '#f8fafc', border: '2px solid #e2e8f0',
               borderRadius: '14px', padding: '16px', fontSize: '16px',
@@ -250,6 +252,28 @@ function Setup({ onSetupComplete }) {
               <option value="Bowl">Bowling</option>
             </select>
           </div>
+        </div>
+
+        <div style={{ background: 'white', borderRadius: '20px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+          <label style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px', display: 'block', marginBottom: '10px' }}>
+            Skip 1st Innings? Directly Target (Optional)
+          </label>
+          <input
+            type="number"
+            placeholder="e.g. 150"
+            value={chaseTarget}
+            onChange={(e) => setChaseTarget(e.target.value)}
+            style={{
+              width: '100%', background: '#f8fafc', border: '1.5px solid #e2e8f0',
+              borderRadius: '12px', padding: '14px', fontSize: '16px',
+              outline: 'none', boxSizing: 'border-box'
+            }}
+          />
+          {chaseTarget && (
+            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '10px', fontWeight: 600 }}>
+              <span style={{ color: '#2563eb' }}>Note:</span> Toss winner/choice will determine the chasing team. The team currently set to bat will chase this target!
+            </div>
+          )}
         </div>
 
         <button

@@ -148,7 +148,15 @@ function App() {
   });
 
   useEffect(() => {
-    const timer = setTimeout(() => setScreen('setup'), 2000);
+    const timer = setTimeout(() => {
+      const activeMatch = localStorage.getItem('active11s_matchData');
+      if (activeMatch) {
+        setMatchData(JSON.parse(activeMatch));
+        setScreen('scoreboard');
+      } else {
+        setScreen('setup');
+      }
+    }, 2000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -159,6 +167,7 @@ function App() {
 
   const handleMatchStart = (finalData) => {
     setMatchData(finalData);
+    localStorage.setItem('active11s_matchData', JSON.stringify(finalData));
     setScreen('scoreboard');
   };
 
@@ -167,6 +176,10 @@ function App() {
   const handleMatchEnd = (summary) => {
     saveMatchSummary(summary);
     setMatchData(null);
+    localStorage.removeItem('active11s_matchData');
+    Object.keys(localStorage).forEach(k => {
+      if (k.startsWith('active11s_live_')) localStorage.removeItem(k);
+    });
     // Refresh match history
     try {
       const updated = JSON.parse(localStorage.getItem('active11s_history') || '[]');

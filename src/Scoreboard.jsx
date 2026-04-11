@@ -1,4 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+function useLiveState(key, initialData) {
+  const [state, setState] = useState(() => {
+    try {
+       const saved = localStorage.getItem('active11s_live_' + key);
+       if (saved !== null) return JSON.parse(saved);
+    } catch(e) {}
+    return typeof initialData === 'function' ? initialData() : initialData;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('active11s_live_' + key, JSON.stringify(state));
+  }, [key, state]);
+
+  return [state, setState];
+}
 
 const WICKET_TYPES = ['Bowled', 'Caught', 'LBW', 'Run Out', 'Stumped', 'Hit Wicket', 'Retired'];
 const NEEDS_FIELDER = ['Caught', 'Run Out', 'Stumped'];
@@ -104,23 +120,23 @@ export function printScorecard(m) {
 
 // ── Scoreboard ────────────────────────────────────────────────────────────────
 function Scoreboard({ data, onMatchEnd }) {
-  const [totalScore, setTotalScore] = useState(0);
-  const [wkts, setWkts] = useState(0);
-  const [legalBalls, setLegalBalls] = useState(0);
-  const [extrasState, setExtrasState] = useState({ wides: 0, noBalls: 0, byes: 0, legByes: 0 });
-  const [batsmen, setBatsmen] = useState([
+  const [totalScore, setTotalScore] = useLiveState('totalScore', 0);
+  const [wkts, setWkts] = useLiveState('wkts', 0);
+  const [legalBalls, setLegalBalls] = useLiveState('legalBalls', 0);
+  const [extrasState, setExtrasState] = useLiveState('extrasState', { wides: 0, noBalls: 0, byes: 0, legByes: 0 });
+  const [batsmen, setBatsmen] = useLiveState('batsmen', [
     { name: data.batsmen[0], runs: 0, balls: 0, fours: 0, sixes: 0 },
     { name: data.batsmen[1], runs: 0, balls: 0, fours: 0, sixes: 0 },
   ]);
-  const [striker, setStriker] = useState(0);
-  const [dismissed, setDismissed] = useState([]);
-  const [bowler, setBowler] = useState({ name: data.bowler, balls: 0, runs: 0, wkts: 0 });
-  const [doneBowlers, setDoneBowlers] = useState([]);
-  const [overHistory, setOverHistory] = useState([]);
-  const [currOver, setCurrOver] = useState([]);
+  const [striker, setStriker] = useLiveState('striker', 0);
+  const [dismissed, setDismissed] = useLiveState('dismissed', []);
+  const [bowler, setBowler] = useLiveState('bowler', { name: data.bowler, balls: 0, runs: 0, wkts: 0 });
+  const [doneBowlers, setDoneBowlers] = useLiveState('doneBowlers', []);
+  const [overHistory, setOverHistory] = useLiveState('overHistory', []);
+  const [currOver, setCurrOver] = useLiveState('currOver', []);
 
   // ── Snapshot undo ──────────────────────────────────────────────────────────
-  const [snapHistory, setSnapHistory] = useState([]);
+  const [snapHistory, setSnapHistory] = useLiveState('snapHistory', []);
   const getCurrentSnap = () => ({
     totalScore, wkts, legalBalls, extrasState: { ...extrasState },
     batsmen: batsmen.map(b => ({ ...b })), striker,
@@ -140,23 +156,23 @@ function Scoreboard({ data, onMatchEnd }) {
   };
 
   // ── Modals ─────────────────────────────────────────────────────────────────
-  const [wicketModal, setWicketModal] = useState(false);
+  const [wicketModal, setWicketModal] = useLiveState('wkModal', false);
   const [wkType, setWkType] = useState('');
   const [fielder, setFielder] = useState('');
   const [newBatName, setNewBatName] = useState('');
-  const [bowlerModal, setBowlerModal] = useState(false);
+  const [bowlerModal, setBowlerModal] = useLiveState('bowlerModal', false);
   const [newBowlerName, setNewBowlerName] = useState('');
   const [tab, setTab] = useState('score');
   const [potm, setPotm] = useState('');
   const [bestBowlerAward, setBestBowlerAward] = useState('');
-  const [activeBattingTeam, setActiveBattingTeam] = useState(data.battingTeam);
+  const [activeBattingTeam, setActiveBattingTeam] = useLiveState('activeBat', data.battingTeam);
   
   // ── Innings Management ───────────────────────────────────────────────────
-  const [innings, setInnings] = useState(1);
-  const [target, setTarget] = useState(null);
-  const [innings1Data, setInnings1Data] = useState(null);
-  const [inningsCompleteModal, setInningsCompleteModal] = useState(false);
-  const [matchOverModal, setMatchOverModal] = useState(false);
+  const [innings, setInnings] = useLiveState('innings', data.chaseTarget ? 2 : 1);
+  const [target, setTarget] = useLiveState('target', data.chaseTarget ? parseInt(data.chaseTarget, 10) : null);
+  const [innings1Data, setInnings1Data] = useLiveState('in1Data', data.chaseTarget ? { score: parseInt(data.chaseTarget, 10) - 1, wkts: 10, overs: data.totalOvers } : null);
+  const [inningsCompleteModal, setInningsCompleteModal] = useLiveState('inningsComp', false);
+  const [matchOverModal, setMatchOverModal] = useLiveState('matchOver', false);
 
   const [nextBat1, setNextBat1] = useState('');
   const [nextBat2, setNextBat2] = useState('');
@@ -165,7 +181,7 @@ function Scoreboard({ data, onMatchEnd }) {
   const overs = Math.floor(legalBalls / 6);
   const ballsThisOver = legalBalls % 6;
   const totalExtras = extrasState.wides + extrasState.noBalls + extrasState.byes + extrasState.legByes;
-  const totalOvers = data.totalOvers || 20;
+  const totalOvers = parseInt(data.totalOvers, 10) || 20;
 
   const isInningsOver = legalBalls >= totalOvers * 6 || wkts >= 10;
   const isTargetReached = target !== null && totalScore >= target;
