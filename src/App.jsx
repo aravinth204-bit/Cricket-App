@@ -151,14 +151,22 @@ function App() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      const activeMatch = localStorage.getItem('active11s_matchData');
-      if (activeMatch) {
-        setMatchData(JSON.parse(activeMatch));
-        setScreen('scoreboard');
-      } else {
-        setScreen('setup');
+      try {
+        const activeMatch = localStorage.getItem('active11s_matchData');
+        if (activeMatch && activeMatch !== 'undefined') {
+          const parsed = JSON.parse(activeMatch);
+          if (parsed && typeof parsed === 'object') {
+            setMatchData(parsed);
+            setScreen('scoreboard');
+            return;
+          }
+        }
+      } catch (e) {
+        console.error("Failed to parse active match data:", e);
+        localStorage.removeItem('active11s_matchData');
       }
-    }, 2000);
+      setScreen('setup');
+    }, 1500); // Reduced to 1.5s for better UX
     return () => clearTimeout(timer);
   }, []);
 
