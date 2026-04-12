@@ -152,6 +152,29 @@ export function printScorecard(m) {
   if (win) { win.document.write(html); win.document.close(); }
 }
 
+// ── Shared helpers ─────────────────────────────────────────────────────────
+const runBtnStyle = (bg = '#f1f5f9', col = '#0f172a') => ({
+  flex: 1, minHeight: '56px', background: bg, border: 'none',
+  borderRadius: '16px', fontSize: '20px', fontWeight: 800, color: col,
+  cursor: 'pointer', fontFamily: 'inherit',
+});
+
+const ballDot = (label, i) => {
+  const isWide = label === 'Wd', isNb = label.startsWith('Nb'), isW = label === 'W';
+  const isFour = label === '4', isSix = label === '6';
+  const bg = isW ? '#ef4444' : isFour ? '#3b82f6' : isSix ? '#8b5cf6' : isWide || isNb ? '#f59e0b' : '#e2e8f0';
+  const col = (isW || isFour || isSix || isWide || isNb) ? 'white' : '#0f172a';
+  return <div key={i} style={{ minWidth: '36px', height: '36px', borderRadius: '50%', background: bg, color: col, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800 }}>{label}</div>;
+};
+
+const Overlay = ({ children }) => (
+  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+    <div style={{ background: 'white', borderRadius: '28px 28px 0 0', padding: '24px 20px 40px', width: '100%', maxWidth: '480px' }}>
+      {children}
+    </div>
+  </div>
+);
+
 // ── Scoreboard ────────────────────────────────────────────────────────────────
 function Scoreboard({ data, onMatchEnd }) {
   const [totalScore, setTotalScore] = useLiveState('totalScore', 0);
@@ -204,10 +227,11 @@ function Scoreboard({ data, onMatchEnd }) {
   // ── Innings Management ───────────────────────────────────────────────────
   const [innings, setInnings] = useLiveState('innings', data.chaseTarget ? 2 : 1);
   const [target, setTarget] = useLiveState('target', data.chaseTarget ? parseInt(data.chaseTarget, 10) : null);
-  const [innings1Data, setInnings1Data] = useLiveState('in1Data', data.chaseTarget ? { score: parseInt(data.chaseTarget, 10) - 1, wkts: 10, overs: data.totalOvers } : null);
+  const [innings1Data, setInnings1Data] = useLiveState('in1Data', data.chaseTarget ? { score: parseInt(data.chaseTarget, 10) - 1, wkts: 10, overs: data.totalOvers, batsmen: [], bowlers: [] } : null);
   const [inningsCompleteModal, setInningsCompleteModal] = useLiveState('inningsComp', false);
   const [matchOverModal, setMatchOverModal] = useLiveState('matchOver', false);
   const [flashMsg, setFlashMsg] = useState(null);
+  const [manualResult, setManualResult] = useState('');
 
   const showFlash = (text, bg, emojis = []) => {
     setFlashMsg({ text, bg, emojis });
@@ -216,39 +240,42 @@ function Scoreboard({ data, onMatchEnd }) {
     }, 2000);
   };
 
+  const [topPerformers, setTopPerformers] = useState({ batsmen: [], bowlers: [] });
+
   useEffect(() => {
-    if (matchOverModal && !potm && !bestBowlerAward) {
+    if (matchOverModal) {
       const allBatsmen = [
-        ...(innings1Data ? innings1Data.batsmen : []),
+        ...(innings1Data && Array.isArray(innings1Data.batsmen) ? innings1Data.batsmen : []),
         ...dismissed,
         ...batsmen
-      ].filter(b => b && b.name && !b.name.includes('Batsman') && !b.name.includes('Striker') && b.balls > 0);
+      ].filter(b => b && b.name && b.balls > 0);
 
       const allBowlers = [
-        ...(innings1Data ? innings1Data.bowlers : []),
+        ...(innings1Data && Array.isArray(innings1Data.bowlers) ? innings1Data.bowlers : []),
         ...doneBowlers,
         { ...bowler, overs: Math.floor(bowler.balls / 6) }
-      ].filter(b => b && b.name && !b.name.includes('Bowler') && (b.balls > 0 || b.overs > 0));
+      ].filter(b => b && b.name && (b.balls > 0 || b.overs > 0));
 
-      let topBat = null, topBatScore = -1;
-      allBatsmen.forEach(b => {
-        const pts = b.runs * 1.5 + b.fours * 1 + b.sixes * 2;
-        if (pts > topBatScore) { topBatScore = pts; topBat = b.name; }
-      });
+      const batList = allBatsmen.map(b => ({
+        name: b.name,
+        pts: (b.runs || 0) * 1 + (b.fours || 0) * 0.5 + (b.sixes || 0) * 1 + ((b.runs || 0) >= 20 ? 10 : 0),
+        desc: `${b.runs}(${b.balls})`
+      })).sort((a, b) => b.pts - a.pts).slice(0, 4);
 
-      let topBowl = null, topBowlScore = -1;
-      allBowlers.forEach(b => {
-        const totalBalls = (typeof b.overs === 'string' ? parseFloat(b.overs) * 6 : (b.overs || 0) * 6) + (b.balls || 0);
-        const overs = totalBalls / 6;
-        const econ = overs > 0 ? b.runs / overs : 0;
-        const pts = (b.wkts * 20) - econ + (b.wkts >= 3 ? 10 : 0);
-        if (pts > topBowlScore) { topBowlScore = pts; topBowl = b.name; }
-      });
+      const bowlList = allBowlers.map(b => ({
+        name: b.name,
+        pts: ((b.wkts || 0) * 25) + (10 - ((b.runs || 0) / (Math.max(1, (b.overs || 0) + (b.balls || 0) / 6)))),
+        desc: `${b.wkts}W ${b.runs}R`
+      })).sort((a, b) => b.pts - a.pts).slice(0, 4);
 
-      if (topBowl) setBestBowlerAward(topBowl);
-      if (topBatScore > topBowlScore && topBat) setPotm(topBat);
-      else if (topBowl) setPotm(topBowl);
-      else if (topBat) setPotm(topBat);
+      setTopPerformers({ batsmen: batList, bowlers: bowlList });
+
+      if (!potm && !bestBowlerAward) {
+        if (bowlList[0]) setBestBowlerAward(bowlList[0].name);
+        if (batList[0] && bowlList[0]) {
+          setPotm(batList[0].pts > bowlList[0].pts ? batList[0].name : bowlList[0].name);
+        } else if (batList[0]) setPotm(batList[0].name);
+      }
     }
   }, [matchOverModal, innings1Data, dismissed, batsmen, doneBowlers, bowler, potm, bestBowlerAward]);
 
@@ -484,35 +511,12 @@ function Scoreboard({ data, onMatchEnd }) {
       battingScorecard: currentBattingScorecard,
       bowlingScorecard: allBowlersList.map(b => ({ name: b.name, overs: `${Math.floor(b.balls / 6)}.${b.balls % 6}`, runs: b.runs, wkts: b.wkts })),
       
-      result: target ? (totalScore >= target ? `${activeBattingTeam} won by ${10 - wkts} wickets` : (isInningsOver ? `${activeBattingTeam === data.teamA.name ? data.teamB.name : data.teamA.name} won by ${target - 1 - totalScore} runs` : 'Match tied')) : undefined
+      result: manualResult || (target ? (totalScore >= target ? `${activeBattingTeam} won by ${10 - wkts} wickets` : (isInningsOver ? `${activeBattingTeam === data.teamA.name ? data.teamB.name : data.teamA.name} won by ${target - 1 - totalScore} runs` : 'Match tied')) : 'Match Summary')
     };
     if (onMatchEnd) onMatchEnd(summary);
   };
 
-  // ── Shared helpers ─────────────────────────────────────────────────────────
-  const runBtnStyle = (bg = '#f1f5f9', col = '#0f172a') => ({
-    flex: 1, minHeight: '56px', background: bg, border: 'none',
-    borderRadius: '16px', fontSize: '20px', fontWeight: 800, color: col,
-    cursor: 'pointer', fontFamily: 'inherit',
-  });
-
-  const ballDot = (label, i) => {
-    const isWide = label === 'Wd', isNb = label.startsWith('Nb'), isW = label === 'W';
-    const isFour = label === '4', isSix = label === '6';
-    const bg = isW ? '#ef4444' : isFour ? '#3b82f6' : isSix ? '#8b5cf6' : isWide || isNb ? '#f59e0b' : '#e2e8f0';
-    const col = (isW || isFour || isSix || isWide || isNb) ? 'white' : '#0f172a';
-    return <div key={i} style={{ minWidth: '36px', height: '36px', borderRadius: '50%', background: bg, color: col, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800 }}>{label}</div>;
-  };
-
   const inpSt = { width: '100%', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '14px 16px', fontSize: '16px', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', color: '#0f172a' };
-
-  const Overlay = ({ children }) => (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-      <div style={{ background: 'white', borderRadius: '28px 28px 0 0', padding: '24px 20px 40px', width: '100%', maxWidth: '480px' }}>
-        {children}
-      </div>
-    </div>
-  );
 
   // ── SCORECARD VIEW ─────────────────────────────────────────────────────────
   if (tab === 'card') {
@@ -831,54 +835,178 @@ function Scoreboard({ data, onMatchEnd }) {
         <>
           <Confetti />
           <Overlay>
-            <div className="win-celebration" style={{ maxHeight: '80vh', overflowY: 'auto' }}>
-              <div style={{ fontSize: '24px', fontWeight: 900, marginBottom: '4px', textAlign: 'center' }}>Match Over! 🏆</div>
-            <div style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '24px', textAlign: 'center' }}>
-              {target ? (totalScore >= target ? `${activeBattingTeam} won by ${10 - wkts} wickets` : (isInningsOver ? `${nextBattingTeam} won by ${target - 1 - totalScore} runs` : 'Finalizing...')) : 'Match Summary'}
-            </div>
+            <div className="win-celebration" style={{ maxHeight: '85vh', overflowY: 'auto', padding: '10px 4px' }}>
+              <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                <div style={{ fontSize: '32px', fontWeight: 900, color: '#0f172a', letterSpacing: '-1.5px', marginBottom: '4px' }}>Match Over! 🏆</div>
+                <div style={{ 
+                  display: 'inline-block',
+                  padding: '6px 16px',
+                  background: '#eff6ff',
+                  borderRadius: '20px',
+                  fontSize: '14px',
+                  fontWeight: 800,
+                  color: '#2563eb',
+                  boxShadow: '0 4px 12px rgba(37,99,235,0.1)'
+                }}>
+                  {manualResult || (target ? (totalScore >= target ? `${activeBattingTeam} won by ${10 - wkts} wickets 🎉` : (isInningsOver ? `${nextBattingTeam} won by ${target - 1 - totalScore} runs 🎯` : 'Match tied 🤝')) : 'Full Match Summary')}
+                </div>
+              </div>
 
-            {/* Score comparison */}
-            <div style={{ background: '#f8fafc', borderRadius: '20px', padding: '20px', marginBottom: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '32px' }}>{data.teamA.logo}</span>
-                  <div>
-                    <div style={{ fontSize: '12px', fontWeight: 700 }}>{data.teamA.name}</div>
-                    <div style={{ fontSize: '24px', fontWeight: 900, color: '#2563eb' }}>
+              {/* Manual Result Declaration */}
+              <div style={{ background: '#f8fafc', borderRadius: '24px', padding: '16px', marginBottom: '28px', border: '1.5px solid #e2e8f0' }}>
+                <label style={{ fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '2px', display: 'block', marginBottom: '12px', textAlign: 'center' }}>
+                  Declare Winner Manually
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  {[
+                    { label: `${data.teamA.name} Won`, val: `${data.teamA.name} Won` },
+                    { label: `${data.teamB.name} Won`, val: `${data.teamB.name} Won` },
+                    { label: 'Draw / Tied', val: 'Match Draw/Tied' },
+                    { label: 'Abandoned', val: 'Match Abandoned' }
+                  ].map(r => (
+                    <button
+                      key={r.val}
+                      onClick={() => setManualResult(manualResult === r.val ? '' : r.val)}
+                      style={{
+                        padding: '12px 6px', borderRadius: '12px', border: '1.5px solid',
+                        borderColor: manualResult === r.val ? '#2563eb' : '#e2e8f0',
+                        background: manualResult === r.val ? '#eff6ff' : 'white',
+                        color: manualResult === r.val ? '#2563eb' : '#64748b',
+                        fontSize: '11px', fontWeight: 800, cursor: 'pointer'
+                      }}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Score comparison card */}
+              <div style={{ 
+                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)', 
+                borderRadius: '28px', 
+                padding: '24px', 
+                marginBottom: '28px',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.05)',
+                border: '1.5px solid #f1f5f9',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px'
+              }}>
+                {/* Team Left */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ 
+                    width: '64px', height: '64px', background: 'white', borderRadius: '50%', 
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 8px 16px rgba(0,0,0,0.06)',
+                    border: '3px solid white'
+                  }}>
+                    {renderLogo(data.teamA.logo, '42px')}
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '2px' }}>{data.teamA.name}</div>
+                    <div style={{ fontSize: '26px', fontWeight: 900, color: '#2563eb', letterSpacing: '-1px' }}>
                       {activeBattingTeam === data.teamA.name ? `${totalScore}/${wkts}` : (innings1Data ? `${innings1Data.score}/${innings1Data.wkts}` : '—')}
                     </div>
                   </div>
                 </div>
-                <div style={{ fontSize: '12px', fontWeight: 800, color: '#cbd5e1' }}>VS</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', textAlign: 'right' }}>
-                  <div>
-                    <div style={{ fontSize: '12px', fontWeight: 700 }}>{data.teamB.name}</div>
-                    <div style={{ fontSize: '24px', fontWeight: 900, color: '#f59e0b' }}>
+
+                <div style={{ 
+                  width: '40px', height: '40px', 
+                  borderRadius: '12px', background: 'white',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '12px', fontWeight: 900, color: '#cbd5e1',
+                  boxShadow: '0 4px 10px rgba(0,0,0,0.04)',
+                  zIndex: 2
+                }}>VS</div>
+
+                {/* Team Right */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ 
+                    width: '64px', height: '64px', background: 'white', borderRadius: '50%', 
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 8px 16px rgba(0,0,0,0.06)',
+                    border: '3px solid white'
+                  }}>
+                    {renderLogo(data.teamB.logo, '42px')}
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '2px' }}>{data.teamB.name}</div>
+                    <div style={{ fontSize: '26px', fontWeight: 900, color: '#f59e0b', letterSpacing: '-1px' }}>
                       {activeBattingTeam === data.teamB.name ? `${totalScore}/${wkts}` : (innings1Data ? `${innings1Data.score}/${innings1Data.wkts}` : '—')}
                     </div>
                   </div>
-                  <span style={{ fontSize: '32px' }}>{data.teamB.logo}</span>
                 </div>
               </div>
-            </div>
 
-            {/* Awards */}
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '10px', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>🏆 Player of the Match</div>
-              <input placeholder="Type name..." value={potm} onChange={e => setPotm(e.target.value)} style={inpSt} />
-            </div>
+              {/* Awards Section */}
+              <div style={{ background: '#f8fafc', borderRadius: '24px', padding: '20px', marginBottom: '28px', border: '1px dashed #e2e8f0' }}>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ fontSize: '10px', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '2px', display: 'block', marginBottom: '8px' }}>
+                    🏆 Player of the Match
+                  </label>
+                  <input 
+                    placeholder="Enter hero name..." 
+                    value={potm} 
+                    onChange={e => setPotm(e.target.value)} 
+                    style={{...inpSt, border: '1.5px solid #ffedd5', background: 'white'}} 
+                  />
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
+                    {topPerformers.batsmen.map(tp => (
+                      <button key={tp.name} onClick={() => setPotm(tp.name)} style={{ background: '#fff7ed', border: '1px solid #ffd8a8', borderRadius: '8px', padding: '4px 8px', fontSize: '10px', color: '#c2410c', fontWeight: 700, cursor: 'pointer' }}>
+                        {tp.name} {tp.desc}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-            <div style={{ marginBottom: '24px' }}>
-              <div style={{ fontSize: '10px', fontWeight: 800, color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>🎳 Best Bowler</div>
-              <input placeholder="Type name..." value={bestBowlerAward} onChange={e => setBestBowlerAward(e.target.value)} style={inpSt} />
-            </div>
+                <div>
+                  <label style={{ fontSize: '10px', fontWeight: 800, color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '2px', display: 'block', marginBottom: '8px' }}>
+                    🎳 Best Bowler Award
+                  </label>
+                  <input 
+                    placeholder="Enter name..." 
+                    value={bestBowlerAward} 
+                    onChange={e => setBestBowlerAward(e.target.value)} 
+                    style={{...inpSt, border: '1.5px solid #f3e8ff', background: 'white'}} 
+                  />
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
+                    {topPerformers.bowlers.map(tp => (
+                      <button key={tp.name} onClick={() => setBestBowlerAward(tp.name)} style={{ background: '#f5f3ff', border: '1px solid #dcd1ff', borderRadius: '8px', padding: '4px 8px', fontSize: '10px', color: '#7c3aed', fontWeight: 700, cursor: 'pointer' }}>
+                        {tp.name} {tp.desc}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <button onClick={() => setMatchOverModal(false)} style={{ padding: '16px', borderRadius: '16px', border: '1.5px solid #e2e8f0', background: 'white', fontWeight: 700, fontSize: '15px' }}>Cancel</button>
-              <button onClick={saveAndEnd} style={{ padding: '16px', borderRadius: '16px', border: 'none', background: '#2563eb', color: 'white', fontWeight: 800, fontSize: '15px' }}>Save & Exit</button>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <button 
+                  onClick={() => setMatchOverModal(false)} 
+                  style={{ 
+                    padding: '18px', borderRadius: '20px', border: '2px solid #f1f5f9', 
+                    background: 'white', fontWeight: 700, fontSize: '16px', color: '#64748b',
+                    cursor: 'pointer', transition: 'all 0.2s' 
+                  }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={saveAndEnd} 
+                  style={{ 
+                    padding: '18px', borderRadius: '20px', border: 'none', 
+                    background: 'linear-gradient(135deg, #1d4ed8, #2563eb)', 
+                    color: 'white', fontWeight: 800, fontSize: '16px',
+                    boxShadow: '0 8px 24px rgba(37,99,235,0.3)',
+                    cursor: 'pointer', transition: 'all 0.2s'
+                  }}
+                >
+                  Save & Exit
+                </button>
+              </div>
             </div>
-          </div>
-        </Overlay>
+          </Overlay>
         </>
       )}
 

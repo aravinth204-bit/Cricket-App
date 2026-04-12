@@ -59,6 +59,24 @@ function Setup({ onSetupComplete }) {
     setTempName('');
   };
 
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteIdx, setDeleteIdx] = useState(null);
+
+  const deleteMatch = (index) => {
+    setDeleteIdx(index);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = () => {
+    if (deleteIdx !== null) {
+      const updated = matchHistory.filter((_, i) => i !== deleteIdx);
+      setMatchHistory(updated);
+      localStorage.setItem('active11s_history', JSON.stringify(updated));
+    }
+    setShowDeleteModal(false);
+    setDeleteIdx(null);
+  };
+
   const handleStart = () => {
     if (!teamA.name || !teamB.name || !venue || !tossWinner || !tossChoice) {
       alert('Fill Team names, Venue and Toss info!');
@@ -321,12 +339,20 @@ function Setup({ onSetupComplete }) {
                       <div style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>{m.ground}</div>
                       <div style={{ fontSize: '10px', fontWeight: 600, color: '#cbd5e1' }}>{m.date}</div>
                     </div>
-                    <button
-                      onClick={() => printScorecard(m)}
-                      style={{ background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: '10px', padding: '6px 12px', fontSize: '11px', fontWeight: 800, color: '#2563eb', cursor: 'pointer', letterSpacing: '0.5px' }}
-                    >
-                      📄 PDF
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => deleteMatch(i)}
+                        style={{ background: '#fef2f2', border: '1.5px solid #fee2e2', borderRadius: '10px', padding: '6px 12px', fontSize: '11px', fontWeight: 800, color: '#dc2626', cursor: 'pointer' }}
+                      >
+                        🗑️
+                      </button>
+                      <button
+                        onClick={() => printScorecard(m)}
+                        style={{ background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: '10px', padding: '6px 12px', fontSize: '11px', fontWeight: 800, color: '#2563eb', cursor: 'pointer', letterSpacing: '0.5px' }}
+                      >
+                        📄 PDF
+                      </button>
+                    </div>
                   </div>
 
                   {/* Team Scores */}
@@ -440,6 +466,47 @@ function Setup({ onSetupComplete }) {
                 }}
               >
                 Set {customInput || '?'} Overs
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Custom Delete Confirmation Modal ── */}
+      {showDeleteModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 110,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px'
+        }}>
+          <div style={{
+            background: 'white', borderRadius: '24px',
+            padding: '32px 24px', width: '100%', maxWidth: '340px',
+            textAlign: 'center', boxShadow: '0 20px 50px rgba(0,0,0,0.15)'
+          }}>
+            <div style={{ fontSize: '40px', marginBottom: '16px' }}>🗑️</div>
+            <div style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>Delete Match?</div>
+            <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '28px', lineHeight: 1.5 }}>
+              Are you sure you want to remove this match from history? This cannot be undone.
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                style={{
+                  padding: '16px', borderRadius: '14px', border: '1.5px solid #e2e8f0',
+                  background: 'white', fontWeight: 700, fontSize: '15px', color: '#64748b', cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                style={{
+                  padding: '16px', borderRadius: '14px', border: 'none',
+                  background: '#dc2626', color: 'white', fontWeight: 800, fontSize: '15px', cursor: 'pointer',
+                  boxShadow: '0 8px 20px rgba(220,38,38,0.25)'
+                }}
+              >
+                Delete
               </button>
             </div>
           </div>
