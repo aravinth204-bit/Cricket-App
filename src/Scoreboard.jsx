@@ -195,6 +195,17 @@ const runBtnStyle = (bg = '#f1f5f9', col = '#0f172a') => ({
 
 const hapticFeedback = () => { if (window.navigator?.vibrate) window.navigator.vibrate(10); };
 
+const speak = (msg) => {
+  const isEnabled = localStorage.getItem('active11s_voice') === 'true';
+  if (isEnabled && 'speechSynthesis' in window) {
+    window.speechSynthesis.cancel(); // Stop any current speech
+    const utterance = new SpeechSynthesisUtterance(msg);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    window.speechSynthesis.speak(utterance);
+  }
+};
+
 const ballDot = (label, i) => {
   const isWide = label.startsWith('Wd'), isNb = label.startsWith('Nb'), isW = label.startsWith('W');
   const isSix = label.includes('6');
@@ -267,6 +278,7 @@ function Scoreboard({ data, onMatchEnd }) {
   const [innings1Data, setInnings1Data] = useLiveState('in1Data', data.chaseTarget ? { score: parseInt(data.chaseTarget, 10) - 1, wkts: 10, overs: data.totalOvers, batsmen: [], bowlers: [] } : null);
   const [inningsCompleteModal, setInningsCompleteModal] = useLiveState('inningsComp', false);
   const [matchOverModal, setMatchOverModal] = useLiveState('matchOver', false);
+  const [freeHit, setFreeHit] = useLiveState('freeHit', false);
   const [flashMsg, setFlashMsg] = useState(null);
   const [manualResult, setManualResult] = useState('');
   
@@ -358,12 +370,27 @@ function Scoreboard({ data, onMatchEnd }) {
       setCurrOver(newCurrOver);
       setTotalScore(newScore);
       setLegalBalls(newLB);
+      const res = `${activeBattingTeam} won by ${10 - wkts} wickets!`;
+      speak(`Match over! ${res}`);
       setMatchOverModal(true);
       return;
     }
 
-    if (batsmanRuns === 4 && creditBatsman) showFlash('FOUR! ✨', '#3b82f6', ['💥', '🎇', '✨', '🏏', '⚡', '⚡']);
-    if (batsmanRuns === 6 && creditBatsman) showFlash('SIX! 🚀', '#8b5cf6', ['🎆', '🧨', '🎆', '🚀', '🔥', '🔥']);
+    if (batsmanRuns === 0 && creditBatsman) speak("It's a dot ball.");
+    if (batsmanRuns === 1 && creditBatsman) speak(`Single taken by ${batsmen[striker].name}.`);
+    if (batsmanRuns === 2 && creditBatsman) speak(`Good running, they get two runs.`);
+    if (batsmanRuns === 3 && creditBatsman) speak(`Wonderful running for three runs!`);
+    
+    if (batsmanRuns === 4 && creditBatsman) {
+      showFlash('FOUR! ✨', '#3b82f6', ['💥', '🎇', '✨', '🏏', '⚡', '⚡']);
+      speak(`Boundary for ${batsmen[striker].name}!`);
+    }
+    if (batsmanRuns === 6 && creditBatsman) {
+      showFlash('SIX! 🚀', '#8b5cf6', ['🎆', '🧨', '🎆', '🚀', '🔥', '🔥']);
+      speak(`Huge six by ${batsmen[striker].name}!`);
+    }
+
+    if (freeHit) setFreeHit(false);
 
     if (newBTO === 0) {
       setOverHistory(h => [...h, newCurrOver]);
@@ -376,9 +403,16 @@ function Scoreboard({ data, onMatchEnd }) {
       setDoneBowlers(updatedDoneBowlers);
       
       if (newLB >= totalOvers * 6) {
-        if (innings === 1) setInningsCompleteModal(true);
-        else setMatchOverModal(true);
+        if (innings === 1) {
+          speak(`Innings over. ${activeBattingTeam} scored ${newScore} for ${wkts}. Target is ${newScore + 1}`);
+          setInningsCompleteModal(true);
+        } else {
+          const res = `${activeBattingTeam === data.teamA.name ? data.teamB.name : data.teamA.name} won by ${target - 1 - newScore} runs!`;
+          speak(`Match over! ${res}`);
+          setMatchOverModal(true);
+        }
       } else {
+        speak(`End of over. ${Math.floor(newLB / 6)} overs completed. ${activeBattingTeam} are ${newScore} for ${wkts}`);
         setBowlerModal(true);
       }
     } else {
@@ -396,6 +430,8 @@ function Scoreboard({ data, onMatchEnd }) {
     setTotalScore(sc => {
       const newScore = sc + total;
       if (innings === 2 && target && newScore >= target) {
+        const res = `${activeBattingTeam} won by ${10 - wkts} wickets!`;
+        speak(`Match over! ${res}`);
         setMatchOverModal(true);
       }
       return newScore;
@@ -403,6 +439,7 @@ function Scoreboard({ data, onMatchEnd }) {
     setExtrasState(e => ({ ...e, wides: e.wides + total }));
     setBowler(b => ({ ...b, runs: b.runs + total }));
     setCurrOver(co => [...co, extraRuns > 0 ? `Wd+${extraRuns}` : 'Wd']);
+    speak("It's a wide ball.");
     if (extraRuns % 2 === 1) setStriker(s => 1 - s);
     setExtraRunsModal(null);
   };
@@ -413,6 +450,8 @@ function Scoreboard({ data, onMatchEnd }) {
     setTotalScore(sc => {
       const newScore = sc + total;
       if (innings === 2 && target && newScore >= target) {
+        const res = `${activeBattingTeam} won by ${10 - wkts} wickets!`;
+        speak(`Match over! ${res}`);
         setMatchOverModal(true);
       }
       return newScore;
@@ -428,17 +467,21 @@ function Scoreboard({ data, onMatchEnd }) {
     }
     setCurrOver(co => [...co, batsmanRuns > 0 ? `Nb+${batsmanRuns}` : 'Nb']);
     if (batsmanRuns % 2 === 1) setStriker(s => 1 - s);
+    setFreeHit(true);
+    speak("No ball! Next ball is a Free Hit");
     setExtraRunsModal(null);
   };
 
   const confirmBye = (runs) => {
     setExtrasState(e => ({ ...e, byes: e.byes + runs }));
+    speak("Bye runs taken.");
     commitLegal({ batsmanRuns: runs, creditBatsman: false, label: `B${runs}` });
     setExtraRunsModal(null);
   };
 
   const confirmLegBye = (runs) => {
     setExtrasState(e => ({ ...e, legByes: e.legByes + runs }));
+    speak("Leg bye runs taken.");
     commitLegal({ batsmanRuns: runs, creditBatsman: false, label: `Lb${runs}` });
     setExtraRunsModal(null);
   };
@@ -472,6 +515,7 @@ function Scoreboard({ data, onMatchEnd }) {
     
     setDismissed(d => [...d, out]);
     setWkts(w => w + 1);
+    speak(`${out.name} is out! ${out.how}. New batsman coming in.`);
     
     const bowlerWkt = !['Run Out', 'Handled Ball', 'Retired'].includes(wkType);
     const newBowler = { 
@@ -496,14 +540,20 @@ function Scoreboard({ data, onMatchEnd }) {
       showFlash('WICKET! 🎯', '#dc2626');
       
       if (isAllOut || newLB >= totalOvers * 6) {
-        if (innings === 1) setInningsCompleteModal(true);
-        else setMatchOverModal(true);
+        if (innings === 1) {
+          speak(`Innings over. ${activeBattingTeam} scored ${newScore || totalScore} for ${newWktsCount}. Target is ${(newScore || totalScore) + 1}`);
+          setInningsCompleteModal(true);
+        } else {
+          const res = (newScore || totalScore) >= target ? `${activeBattingTeam} won by ${10 - newWktsCount} wickets!` : `${activeBattingTeam === data.teamA.name ? data.teamB.name : data.teamA.name} won by ${target - 1 - (newScore || totalScore)} runs!`;
+          speak(`Match over! ${res}`);
+          setMatchOverModal(true);
+        }
       } else {
         // Swap striker if odd runs was completed before run out
         let nextStriker = isRunOut ? (batsmanRuns % 2 === 1 ? 1 - striker : striker) : striker;
         // If the striker himself was out, replace him. If non-striker was out, replace him.
         setBatsmen(bm => bm.map((b, i) => i === outIdx ? { name: newBatName.trim() || `Batsman ${newWktsCount + 2}`, runs: 0, balls: 0, fours: 0, sixes: 0 } : b));
-        setStriker(1 - nextStriker); // Over change always swaps
+        setStriker(1 - nextStriker);
         setDoneBowlers(db => [...db, { ...newBowler, overs: Math.floor(newLB / 6) }]);
         setBowlerModal(true);
       }
@@ -709,9 +759,26 @@ function Scoreboard({ data, onMatchEnd }) {
             <div style={{ fontSize: '11px', fontWeight: 700, color: '#60a5fa', marginTop: '6px' }}>CRR: {currRR}</div>
           </div>
           <div style={{ textAlign: 'right' }}>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={() => {
+                  const current = localStorage.getItem('active11s_voice') === 'true';
+                  localStorage.setItem('active11s_voice', !current);
+                  showFlash(!current ? 'VOICE ON 🔊' : 'VOICE OFF 🔇', !current ? '#10b981' : '#64748b');
+                }}
+                style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', padding: '6px', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                {localStorage.getItem('active11s_voice') === 'true' ? '🔊' : '🔇'}
+              </button>
+            </div>
             <div style={{ fontSize: '26px', fontWeight: 800 }}>{overs}.{ballsThisOver}</div>
             <div style={{ fontSize: '10px', opacity: 0.5, textTransform: 'uppercase' }}>/ {totalOvers} Overs</div>
             {target && <div style={{ fontSize: '12px', color: '#60a5fa', fontWeight: 700, marginTop: '4px' }}>Target: {target}</div>}
+            {freeHit && (
+              <div style={{ background: '#dc2626', color: 'white', fontSize: '10px', fontWeight: 900, padding: '2px 8px', borderRadius: '4px', marginTop: '6px', textAlign: 'center', animation: 'pulse 1s infinite' }}>
+                FREE HIT ⚾
+              </div>
+            )}
             <div style={{ display: 'flex', gap: '6px', marginTop: '8px', justifyContent: 'flex-end' }}>
               <button onClick={() => setTab('card')} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: 'white', padding: '5px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>Scorecard</button>
               <button onClick={() => setMatchOverModal(true)} style={{ background: 'rgba(239,68,68,0.3)', border: '1px solid rgba(239,68,68,0.5)', color: 'white', padding: '5px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>End Match</button>
@@ -850,9 +917,27 @@ function Scoreboard({ data, onMatchEnd }) {
           <div style={{ fontSize: '18px', fontWeight: 800, marginBottom: '4px' }}>How is {batsmen[striker].name} out?</div>
           <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '16px' }}>{batsmen[striker].runs} runs off {batsmen[striker].balls} balls</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
-            {WICKET_TYPES.map(wt => (
-              <button key={wt} onClick={() => setWkType(wt)} style={{ padding: '10px 16px', borderRadius: '12px', border: '1.5px solid', borderColor: wkType === wt ? '#2563eb' : '#e2e8f0', background: wkType === wt ? '#eff6ff' : 'white', color: wkType === wt ? '#2563eb' : '#0f172a', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}>{wt}</button>
-            ))}
+            {WICKET_TYPES.map(wt => {
+              const disabled = freeHit && wt !== 'Run Out';
+              return (
+                <button 
+                  key={wt} 
+                  disabled={disabled}
+                  onClick={() => setWkType(wt)} 
+                  style={{ 
+                    padding: '10px 16px', borderRadius: '12px', border: '1.5px solid', 
+                    borderColor: disabled ? '#e2e8f0' : (wkType === wt ? '#2563eb' : '#e2e8f0'), 
+                    background: disabled ? '#f8fafc' : (wkType === wt ? '#eff6ff' : 'white'), 
+                    color: disabled ? '#cbd5e1' : (wkType === wt ? '#2563eb' : '#0f172a'), 
+                    fontWeight: 700, fontSize: '13px', 
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    opacity: disabled ? 0.6 : 1
+                  }}
+                >
+                  {wt}
+                </button>
+              );
+            })}
           </div>
           {wkType === 'Run Out' && (
             <div style={{ marginBottom: '16px', background: '#f8fafc', padding: '12px', borderRadius: '12px' }}>

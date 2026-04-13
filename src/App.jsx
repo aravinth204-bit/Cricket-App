@@ -3,6 +3,14 @@ import Setup from './Setup';
 import Scoreboard from './Scoreboard';
 import WeeklySeries from './WeeklySeries';
 
+const renderLogo = (logo, size = '40px') => {
+  if (!logo) return '🏏';
+  if (typeof logo === 'string' && (logo.endsWith('.png') || logo.startsWith('/'))) {
+    return <img src={logo} alt="logo" style={{ width: size, height: size, objectFit: 'contain' }} />;
+  }
+  return <span style={{ fontSize: size }}>{logo}</span>;
+};
+
 function SplashScreen() {
   return (
     <div className="splash-container">
@@ -74,7 +82,7 @@ function PlayerSelection({ data, onStartMatch }) {
 
       <div style={{ margin: '20px 20px 0', background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: '16px', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '24px' }}>{battingTeamLogo}</span>
+          {renderLogo(battingTeamLogo, '28px')}
           <div>
             <div style={{ fontSize: '10px', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '1px' }}>Batting</div>
             <div style={{ fontSize: '13px', fontWeight: 800, color: '#1e40af' }}>{data.battingTeam}</div>
@@ -88,7 +96,7 @@ function PlayerSelection({ data, onStartMatch }) {
             <div style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '1px' }}>Bowling</div>
             <div style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a' }}>{bowlingTeamName}</div>
           </div>
-          <span style={{ fontSize: '24px' }}>{bowlingTeamLogo}</span>
+          {renderLogo(bowlingTeamLogo, '28px')}
         </div>
       </div>
 
