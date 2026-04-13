@@ -245,10 +245,15 @@ function Setup({ onSetupComplete }) {
             })}
             {/* Custom button — shows current value if not a preset */}
             {(() => {
-              const isCustom = ![10, 20, 50].includes(totalOvers);
+              const isCustom = ![8, 10, 20].includes(totalOvers);
               return (
                 <button
-                  onClick={() => { setCustomInput(isCustom ? String(totalOvers) : ''); setShowCustomModal(true); }}
+                  type="button"
+                  onClick={(e) => { 
+                    e.preventDefault();
+                    setCustomInput(isCustom ? String(totalOvers) : ''); 
+                    setShowCustomModal(true); 
+                  }}
                   style={{
                     padding: '12px 6px', borderRadius: '12px', border: '1.5px solid',
                     borderColor: isCustom ? '#2563eb' : '#e2e8f0',
@@ -413,20 +418,22 @@ function Setup({ onSetupComplete }) {
       {/* ── Custom Overs Modal ── */}
       {showCustomModal && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100,
-          display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px'
         }}>
           <div style={{
-            background: 'white', borderRadius: '28px 28px 0 0',
-            padding: '28px 24px 44px', width: '100%', maxWidth: '480px'
+            background: 'white', borderRadius: '24px',
+            padding: '30px 24px', width: '100%', maxWidth: '340px',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', animation: 'scaleIn 0.3s ease-out'
           }}>
-            <div style={{ fontSize: '20px', fontWeight: 800, marginBottom: '6px' }}>Custom Overs</div>
-            <div style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '20px' }}>
-              Enter the number of overs for this match
+            <div style={{ fontSize: '20px', fontWeight: 800, marginBottom: '6px', textAlign: 'center' }}>Custom Overs</div>
+            <div style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '24px', textAlign: 'center' }}>
+              Enter the match overs
             </div>
             <input
               autoFocus
               type="number"
+              inputMode="numeric"
               value={customInput}
               onChange={(e) => setCustomInput(e.target.value)}
               onKeyDown={(e) => {
@@ -438,13 +445,14 @@ function Setup({ onSetupComplete }) {
               placeholder="e.g. 15"
               style={{
                 width: '100%', background: '#f8fafc', border: '2px solid #2563eb',
-                borderRadius: '14px', padding: '18px', fontSize: '24px', fontWeight: 800,
+                borderRadius: '16px', padding: '16px', fontSize: '28px', fontWeight: 900,
                 outline: 'none', boxSizing: 'border-box', textAlign: 'center',
-                color: '#0f172a', marginBottom: '16px', letterSpacing: '2px'
+                color: '#0f172a', marginBottom: '20px', letterSpacing: '2px'
               }}
             />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <button
+                type="button"
                 onClick={() => setShowCustomModal(false)}
                 style={{
                   padding: '16px', borderRadius: '14px', border: '1.5px solid #e2e8f0',
@@ -455,6 +463,7 @@ function Setup({ onSetupComplete }) {
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={() => {
                   const v = parseInt(customInput);
                   if (!isNaN(v) && v > 0) { setTotalOvers(v); setShowCustomModal(false); }
@@ -465,7 +474,7 @@ function Setup({ onSetupComplete }) {
                   fontSize: '15px', cursor: 'pointer', fontFamily: 'inherit'
                 }}
               >
-                Set {customInput || '?'} Overs
+                Set
               </button>
             </div>
           </div>

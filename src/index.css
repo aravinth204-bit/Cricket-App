@@ -355,3 +355,45 @@ body {
   0% { transform: scale(0.5); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
 }
+/* Tactile 3D Buttons */
+.tactile-btn {
+  position: relative;
+  transition: all 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 0 0 rgba(0,0,0,0.1);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tactile-btn:active {
+  transform: translateY(3px) !important;
+  box-shadow: 0 1px 0 0 rgba(0,0,0,0.1) !important;
+}
+
+.tactile-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 50%, rgba(0,0,0,0.05) 100%);
+  pointer-events: none;
+}
+
+.tactile-btn-blue { box-shadow: 0 4px 0 0 #1e40af !important; }
+.tactile-btn-blue:active { box-shadow: 0 1px 0 0 #1e40af !important; }
+
+.tactile-btn-purple { box-shadow: 0 4px 0 0 #5b21b6 !important; }
+.tactile-btn-purple:active { box-shadow: 0 1px 0 0 #5b21b6 !important; }
+
+.tactile-btn-red { box-shadow: 0 4px 0 0 #991b1b !important; }
+.tactile-btn-red:active { box-shadow: 0 1px 0 0 #991b1b !important; }
+
+.tactile-btn-green { box-shadow: 0 4px 0 0 #166534 !important; }
+.tactile-btn-green:active { box-shadow: 0 1px 0 0 #166534 !important; }
+
+.tactile-btn-amber { box-shadow: 0 4px 0 0 #92400e !important; }
+.tactile-btn-amber:active { box-shadow: 0 1px 0 0 #92400e !important; }
+
+.tactile-btn-slate { box-shadow: 0 4px 0 0 #334155 !important; }
+.tactile-btn-slate:active { box-shadow: 0 1px 0 0 #334155 !important; }

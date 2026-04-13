@@ -57,95 +57,129 @@ const Confetti = () => {
 
 // ── PDF Generator (opens print window) ────────────────────────────────────────
 export function printScorecard(m) {
-  const battingRows = (m.battingScorecard || []).map(b => `
-    <tr>
-      <td>${b.name}</td><td class="sm">${b.status || ''}</td>
-      <td class="n">${b.runs}</td><td class="n">${b.balls}</td>
-      <td class="n">${b.fours || 0}</td><td class="n">${b.sixes || 0}</td>
-      <td class="n">${sr(b.runs, b.balls)}</td>
-    </tr>`).join('');
+  const renderInnings = (inn, teamName) => {
+    if (!inn || !inn.battingScorecard || inn.battingScorecard.length === 0) return '';
+    
+    const battingRows = inn.battingScorecard.map(b => `
+      <tr>
+        <td>${b.name}</td><td class="sm">${b.status || ''}</td>
+        <td class="n">${b.runs}</td><td class="n">${b.balls}</td>
+        <td class="n">${b.fours || 0}</td><td class="n">${b.sixes || 0}</td>
+        <td class="n">${sr(b.runs, b.balls)}</td>
+      </tr>`).join('');
 
-  const bowlingRows = (m.bowlingScorecard || []).map(b => `
-    <tr>
-      <td>${b.name}</td><td class="n">${b.overs}</td>
-      <td class="n">${b.runs}</td><td class="n">${b.wkts}</td>
-    </tr>`).join('');
+    const bowlingRows = (inn.bowlingScorecard || []).map(b => `
+      <tr>
+        <td>${b.name}</td><td class="n">${b.overs}</td>
+        <td class="n">${b.runs}</td><td class="n">${b.wkts}</td>
+      </tr>`).join('');
 
-  const extras = m.extras
-    ? `Wd:${m.extras.wides} Nb:${m.extras.noBalls} B:${m.extras.byes} Lb:${m.extras.legByes}`
-    : '';
+    const ex = inn.extras || { wides: 0, noBalls: 0, byes: 0, legByes: 0 };
+    const extrasStr = `Wd:${ex.wides} Nb:${ex.noBalls} B:${ex.byes} Lb:${ex.legByes} (Total:${ex.wides + ex.noBalls + ex.byes + ex.legByes})`;
+
+    return `
+      <div class="section-title">⚡ Batting — ${teamName} (${inn.score}/${inn.wkts})</div>
+      <table>
+        <thead><tr><th>Batsman</th><th>Dismissal</th><th class="n">R</th><th class="n">B</th><th class="n">4s</th><th class="n">6s</th><th class="n">SR</th></tr></thead>
+        <tbody>${battingRows}</tbody>
+        <tfoot><tr><td colspan="2" style="font-weight:700">Extras</td><td colspan="5" style="text-align:right;color:#64748b;font-size:12px">${extrasStr}</td></tr></tfoot>
+      </table>
+
+      <div class="section-title">🎳 Bowling</div>
+      <table>
+        <thead><tr><th>Bowler</th><th class="n">O</th><th class="n">R</th><th class="n">W</th></tr></thead>
+        <tbody>${bowlingRows}</tbody>
+      </table>
+    `;
+  };
 
   const html = `<!DOCTYPE html><html><head>
   <meta charset="utf-8" />
-  <title>ACTIVE 11S - Scorecard</title>
+  <title>ACTIVE 11S - Full Scorecard</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 24px; color: #0f172a; }
+    body { font-family: 'Segoe UI', Roboto, Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 24px; color: #0f172a; line-height: 1.4; }
     .header { text-align: center; border-bottom: 3px solid #2563eb; padding-bottom: 16px; margin-bottom: 20px; }
-    .brand { font-size: 26px; font-weight: 900; color: #2563eb; letter-spacing: -1px; }
-    .match-info { font-size: 13px; color: #64748b; margin-top: 4px; }
-    .score-box { display: flex; justify-content: space-between; background: #1e3a8a; color: white; border-radius: 12px; padding: 18px 24px; margin-bottom: 20px; }
-    .team-score h2 { margin: 0; font-size: 14px; opacity: 0.7; }
-    .team-score .runs { font-size: 36px; font-weight: 900; letter-spacing: -2px; }
-    .team-score .overs { font-size: 13px; opacity: 0.6; }
+    .brand { font-size: 28px; font-weight: 900; color: #2563eb; letter-spacing: -1px; }
+    .match-info { font-size: 13px; color: #64748b; margin-top: 4px; font-weight: 600; }
+    .score-box { display: flex; justify-content: space-between; background: #1e3a8a; color: white; border-radius: 16px; padding: 20px 30px; margin-bottom: 24px; box-shadow: 0 4px 20px rgba(30,58,138,0.2); }
+    .team-score h2 { margin: 0; font-size: 14px; opacity: 0.8; text-transform: uppercase; letter-spacing: 1px; }
+    .team-score .runs { font-size: 38px; font-weight: 900; letter-spacing: -2px; }
+    .team-score .overs { font-size: 13px; opacity: 0.7; font-weight: 600; }
+    .result-banner { background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 12px; padding: 12px; text-align: center; color: #15803d; font-weight: 800; font-size: 15px; margin-bottom: 24px; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 13px; }
-    th { background: #2563eb; color: white; padding: 8px 10px; text-align: left; font-size: 11px; letter-spacing: 0.5px; }
-    td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; }
-    tr:hover td { background: #f8fafc; }
-    .n { text-align: right; font-weight: 700; }
+    th { background: #2563eb; color: white; padding: 10px 12px; text-align: left; font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; }
+    td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }
+    tr:nth-child(even) td { background: #fcfdfe; }
+    .n { text-align: right; font-weight: 700; width: 40px; }
     .sm { color: #94a3b8; font-size: 11px; }
-    .section-title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin: 16px 0 8px; }
-    .awards { display: flex; gap: 20px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; }
-    .award-item { font-size: 13px; }
-    .award-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #b45309; }
+    .section-title { font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #1e40af; margin: 30px 0 12px; border-left: 4px solid #2563eb; padding-left: 10px; }
+    .awards { display: flex; gap: 20px; background: #fffbeb; border: 1.5px solid #fde68a; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; }
+    .award-item { flex: 1; }
+    .award-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px; color: #b45309; margin-bottom: 4px; }
     .award-name { font-size: 16px; font-weight: 800; color: #0f172a; }
-    .footer { text-align: center; font-size: 11px; color: #94a3b8; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 12px; }
-    @media print { body { padding: 0 12px; } }
+    .footer { text-align: center; font-size: 11px; color: #94a3b8; margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+    @media print { body { padding: 0; } .score-box { box-shadow: none; border: 1px solid #1e3a8a; } }
   </style>
 </head><body>
   <div class="header">
-    <div class="brand">ACTIVE 11'S</div>
-    <div class="match-info">${m.ground} &nbsp;|&nbsp; ${m.date}</div>
+    <div class="brand">ACTIVE 11'S CRICKET</div>
+    <div class="match-info">${m.ground} &nbsp;•&nbsp; ${m.date}</div>
   </div>
 
   <div class="score-box">
     <div class="team-score" style="text-align:left">
       <h2>${renderLogoHtml(m.teamALogo, '18px')} ${m.teamAName}</h2>
-      ${m.teamAScore !== undefined
-        ? `<div class="runs">${m.teamAScore}/${m.teamAWkts}</div><div class="overs">${m.teamAOvers} Overs</div>`
-        : `<div style="opacity:0.5;font-size:14px">Yet to bat</div>`}
+      <div class="runs">${m.teamAScore !== undefined ? `${m.teamAScore}/${m.teamAWkts}` : '—'}</div>
+      <div class="overs">${m.teamAOvers !== undefined ? `${m.teamAOvers} Overs` : ''}</div>
     </div>
-    <div style="font-size:18px;align-self:center;opacity:0.4">vs</div>
+    <div style="font-size:24px;align-self:center;opacity:0.3;font-weight:900">VS</div>
     <div class="team-score" style="text-align:right">
       <h2>${m.teamBName} ${renderLogoHtml(m.teamBLogo, '18px')}</h2>
-      ${m.teamBScore !== undefined
-        ? `<div class="runs">${m.teamBScore}/${m.teamBWkts}</div><div class="overs">${m.teamBOvers} Overs</div>`
-        : `<div style="opacity:0.5;font-size:14px">Yet to bat</div>`}
+      <div class="runs">${m.teamBScore !== undefined ? `${m.teamBScore}/${m.teamBWkts}` : '—'}</div>
+      <div class="overs">${m.teamBOvers !== undefined ? `${m.teamBOvers} Overs` : ''}</div>
     </div>
   </div>
 
+  <div class="result-banner">${m.result}</div>
+
   ${(m.potm || m.bestBowler) ? `
   <div class="awards">
-    ${m.potm ? `<div class="award-item"><div class="award-label">🏆 Player of Match</div><div class="award-name">${m.potm}</div></div>` : ''}
+    ${m.potm ? `<div class="award-item"><div class="award-label">✨ Player of the Match</div><div class="award-name">${m.potm}</div></div>` : ''}
     ${m.bestBowler ? `<div class="award-item"><div class="award-label">🎳 Best Bowler</div><div class="award-name">${m.bestBowler}</div></div>` : ''}
   </div>` : ''}
 
-  ${m.battingScorecard && m.battingScorecard.length > 0 ? `
-  <div class="section-title">⚡ Batting — ${m.battingTeam || ''}</div>
-  <table>
-    <thead><tr><th>Batsman</th><th>Dismissal</th><th class="n">R</th><th class="n">B</th><th class="n">4s</th><th class="n">6s</th><th class="n">SR</th></tr></thead>
-    <tbody>${battingRows}</tbody>
-    <tfoot><tr><td colspan="2" style="font-weight:700">Extras</td><td colspan="5" style="text-align:right;color:#64748b;font-size:12px">${extras}</td></tr></tfoot>
-  </table>` : ''}
+  ${(m.topBatsmen || m.topBowlers) ? `
+  <div class="section-title">🌟 Top Performers</div>
+  <div style="display: flex; gap: 16px; margin-bottom: 30px;">
+    <div style="flex: 1; background: #eff6ff; border-radius: 12px; padding: 16px; border: 1px solid #bfdbfe;">
+      <div style="font-size: 10px; font-weight: 800; color: #2563eb; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;">🔥 Top Batsmen</div>
+      ${(m.topBatsmen || []).map(tp => `
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px;">
+          <span style="font-weight: 700;">${tp.name}</span>
+          <span style="color: #1e40af; font-weight: 800;">${tp.desc}</span>
+        </div>
+      `).join('')}
+    </div>
+    <div style="flex: 1; background: #f5f3ff; border-radius: 12px; padding: 16px; border: 1px solid #ddd6fe;">
+      <div style="font-size: 10px; font-weight: 800; color: #7c3aed; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;">🎯 Top Bowlers</div>
+      ${(m.topBowlers || []).map(tp => `
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px;">
+          <span style="font-weight: 700;">${tp.name}</span>
+          <span style="color: #6d28d9; font-weight: 800;">${tp.desc}</span>
+        </div>
+      `).join('')}
+    </div>
+  </div>` : ''}
 
-  ${m.bowlingScorecard && m.bowlingScorecard.length > 0 ? `
-  <div class="section-title">🎳 Bowling</div>
-  <table>
-    <thead><tr><th>Bowler</th><th class="n">O</th><th class="n">R</th><th class="n">W</th></tr></thead>
-    <tbody>${bowlingRows}</tbody>
-  </table>` : ''}
+  ${renderInnings(m.innings1, m.innings1?.teamName)}
+  <div style="margin: 40px 0; border-top: 2px dashed #e2e8f0;"></div>
+  ${renderInnings(m.innings2, m.innings2?.teamName)}
 
-  <div class="footer">Generated by ACTIVE 11S Cricket App &nbsp;•&nbsp; ${new Date().toLocaleDateString()}</div>
-  <script>setTimeout(() => window.print(), 400);</script>
+  <div class="footer">
+    Generated by <b>ACTIVE 11S Cricket App</b> &nbsp;•&nbsp; Digital Scorecard No: #${Math.floor(Math.random()*900000+100000)}<br>
+    Professional Match Analytics & Statistics • ${new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+  </div>
+  <script>setTimeout(() => window.print(), 600);</script>
 </body></html>`;
 
   const win = window.open('', '_blank');
@@ -154,17 +188,20 @@ export function printScorecard(m) {
 
 // ── Shared helpers ─────────────────────────────────────────────────────────
 const runBtnStyle = (bg = '#f1f5f9', col = '#0f172a') => ({
-  flex: 1, minHeight: '56px', background: bg, border: 'none',
+  flex: 1, minHeight: '60px', background: bg, border: 'none',
   borderRadius: '16px', fontSize: '20px', fontWeight: 800, color: col,
   cursor: 'pointer', fontFamily: 'inherit',
 });
 
+const hapticFeedback = () => { if (window.navigator?.vibrate) window.navigator.vibrate(10); };
+
 const ballDot = (label, i) => {
-  const isWide = label === 'Wd', isNb = label.startsWith('Nb'), isW = label === 'W';
-  const isFour = label === '4', isSix = label === '6';
-  const bg = isW ? '#ef4444' : isFour ? '#3b82f6' : isSix ? '#8b5cf6' : isWide || isNb ? '#f59e0b' : '#e2e8f0';
+  const isWide = label.startsWith('Wd'), isNb = label.startsWith('Nb'), isW = label.startsWith('W');
+  const isSix = label.includes('6');
+  const isFour = label.includes('4');
+  const bg = isW ? '#ef4444' : (isWide || isNb ? '#f59e0b' : (isSix ? '#8b5cf6' : (isFour ? '#3b82f6' : '#e2e8f0')));
   const col = (isW || isFour || isSix || isWide || isNb) ? 'white' : '#0f172a';
-  return <div key={i} style={{ minWidth: '36px', height: '36px', borderRadius: '50%', background: bg, color: col, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800 }}>{label}</div>;
+  return <div key={i} style={{ minWidth: '36px', height: '36px', borderRadius: '50%', background: bg, color: col, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 800, padding: '0 4px', whiteSpace: 'nowrap' }}>{label}</div>;
 };
 
 const Overlay = ({ children }) => (
@@ -232,6 +269,10 @@ function Scoreboard({ data, onMatchEnd }) {
   const [matchOverModal, setMatchOverModal] = useLiveState('matchOver', false);
   const [flashMsg, setFlashMsg] = useState(null);
   const [manualResult, setManualResult] = useState('');
+  
+  // ── Complex Extras States ────────────────────────────────────────────────
+  const [extraRunsModal, setExtraRunsModal] = useState(null); // 'wide' or 'noBall'
+  const [runOutDetails, setRunOutDetails] = useState({ runs: 0, outStriker: true });
 
   const showFlash = (text, bg, emojis = []) => {
     setFlashMsg({ text, bg, emojis });
@@ -349,21 +390,24 @@ function Scoreboard({ data, onMatchEnd }) {
 
   const handleRun = (runs) => commitLegal({ batsmanRuns: runs, creditBatsman: true, label: runs === 0 ? '•' : String(runs) });
 
-  const handleWide = () => {
+  const confirmWide = (extraRuns) => {
     takeSnap();
+    const total = 1 + extraRuns;
     setTotalScore(sc => {
-      const newScore = sc + 1;
+      const newScore = sc + total;
       if (innings === 2 && target && newScore >= target) {
         setMatchOverModal(true);
       }
       return newScore;
     });
-    setExtrasState(e => ({ ...e, wides: e.wides + 1 }));
-    setBowler(b => ({ ...b, runs: b.runs + 1 }));
-    setCurrOver(co => [...co, 'Wd']);
+    setExtrasState(e => ({ ...e, wides: e.wides + total }));
+    setBowler(b => ({ ...b, runs: b.runs + total }));
+    setCurrOver(co => [...co, extraRuns > 0 ? `Wd+${extraRuns}` : 'Wd']);
+    if (extraRuns % 2 === 1) setStriker(s => 1 - s);
+    setExtraRunsModal(null);
   };
 
-  const handleNoBall = (batsmanRuns = 0) => {
+  const confirmNoBall = (batsmanRuns) => {
     takeSnap();
     const total = 1 + batsmanRuns;
     setTotalScore(sc => {
@@ -383,38 +427,68 @@ function Scoreboard({ data, onMatchEnd }) {
       }));
     }
     setCurrOver(co => [...co, batsmanRuns > 0 ? `Nb+${batsmanRuns}` : 'Nb']);
-    if (total % 2 === 1) setStriker(s => 1 - s);
+    if (batsmanRuns % 2 === 1) setStriker(s => 1 - s);
+    setExtraRunsModal(null);
   };
 
-  const handleBye = (runs) => {
+  const confirmBye = (runs) => {
     setExtrasState(e => ({ ...e, byes: e.byes + runs }));
     commitLegal({ batsmanRuns: runs, creditBatsman: false, label: `B${runs}` });
+    setExtraRunsModal(null);
   };
 
-  const handleLegBye = (runs) => {
+  const confirmLegBye = (runs) => {
     setExtrasState(e => ({ ...e, legByes: e.legByes + runs }));
     commitLegal({ batsmanRuns: runs, creditBatsman: false, label: `Lb${runs}` });
+    setExtraRunsModal(null);
   };
 
-  const openWicketModal = () => { setWkType(''); setFielder(''); setNewBatName(''); setWicketModal(true); };
+  const openWicketModal = () => { setWkType(''); setFielder(''); setNewBatName(''); setRunOutDetails({ runs: 0, outStriker: true }); setWicketModal(true); };
 
   const confirmWicket = () => {
     if (!wkType) return;
     takeSnap();
+    
+    // For Run Out, we use the selected player and include completed runs
+    const isRunOut = wkType === 'Run Out';
+    const outIdx = isRunOut ? (runOutDetails.outStriker ? striker : 1 - striker) : striker;
+    const batsmanRuns = isRunOut ? runOutDetails.runs : 0;
+    
     const newLB = legalBalls + 1;
     const newBTO = newLB % 6;
-    const out = { ...batsmen[striker], balls: batsmen[striker].balls + 1, how: wkType + (fielder ? ` (${fielder})` : '') };
+    
+    // Update score with completed runs for Run Out
+    if (batsmanRuns > 0) {
+      setTotalScore(sc => sc + batsmanRuns);
+      setBatsmen(bm => bm.map((b, i) => i === striker ? { ...b, runs: b.runs + batsmanRuns, balls: b.balls + 1 } : (i === 1 - striker && !isRunOut ? { ...b, balls: b.balls + 1 } : b)));
+    }
+
+    const out = { 
+      ...batsmen[outIdx], 
+      balls: batsmen[outIdx].balls + (outIdx === striker ? 1 : 0), 
+      runs: outIdx === striker ? batsmen[outIdx].runs + (isRunOut ? batsmanRuns : 0) : batsmen[outIdx].runs,
+      how: wkType + (fielder ? ` (${fielder})` : '') 
+    };
+    
     setDismissed(d => [...d, out]);
     setWkts(w => w + 1);
+    
     const bowlerWkt = !['Run Out', 'Handled Ball', 'Retired'].includes(wkType);
-    const newBowler = { ...bowler, balls: bowler.balls + 1, wkts: bowler.wkts + (bowlerWkt ? 1 : 0) };
+    const newBowler = { 
+      ...bowler, 
+      balls: bowler.balls + 1, 
+      runs: bowler.runs + (isRunOut ? batsmanRuns : 0),
+      wkts: bowler.wkts + (bowlerWkt ? 1 : 0) 
+    };
     setBowler(newBowler);
     
     const newWktsCount = wkts + 1;
     const isAllOut = newWktsCount >= 10;
+    
+    const label = isRunOut ? `W(RO+${batsmanRuns})` : 'W';
 
     if (newBTO === 0 || isAllOut) {
-      const finalOver = [...currOver, 'W'];
+      const finalOver = [...currOver, label];
       setOverHistory(h => [...h, finalOver]);
       setCurrOver([]);
       setLegalBalls(newLB);
@@ -425,15 +499,20 @@ function Scoreboard({ data, onMatchEnd }) {
         if (innings === 1) setInningsCompleteModal(true);
         else setMatchOverModal(true);
       } else {
-        setStriker(s => 1 - s);
-        setBatsmen(bm => bm.map((b, i) => i === striker ? { name: newBatName.trim() || `Batsman ${newWktsCount + 2}`, runs: 0, balls: 0, fours: 0, sixes: 0 } : b));
+        // Swap striker if odd runs was completed before run out
+        let nextStriker = isRunOut ? (batsmanRuns % 2 === 1 ? 1 - striker : striker) : striker;
+        // If the striker himself was out, replace him. If non-striker was out, replace him.
+        setBatsmen(bm => bm.map((b, i) => i === outIdx ? { name: newBatName.trim() || `Batsman ${newWktsCount + 2}`, runs: 0, balls: 0, fours: 0, sixes: 0 } : b));
+        setStriker(1 - nextStriker); // Over change always swaps
         setDoneBowlers(db => [...db, { ...newBowler, overs: Math.floor(newLB / 6) }]);
         setBowlerModal(true);
       }
     } else {
-      setBatsmen(bm => bm.map((b, i) => i === striker ? { name: newBatName.trim() || `Batsman ${newWktsCount + 2}`, runs: 0, balls: 0, fours: 0, sixes: 0 } : b));
-      setCurrOver(co => [...co, 'W']);
+      setBatsmen(bm => bm.map((b, i) => i === outIdx ? { name: newBatName.trim() || `Batsman ${newWktsCount + 2}`, runs: 0, balls: 0, fours: 0, sixes: 0 } : b));
+      setCurrOver(co => [...co, label]);
       setLegalBalls(newLB);
+      // Swap if odd runs completed
+      if (isRunOut && batsmanRuns % 2 === 1) setStriker(s => 1 - s);
       setWicketModal(false);
       showFlash('WICKET! 🎯', '#dc2626', ['😭', '💔', '☝️', '📉', '🥀']);
     }
@@ -446,8 +525,8 @@ function Scoreboard({ data, onMatchEnd }) {
       wkts: wkts,
       overs: `${overs}.${ballsThisOver}`,
       extras: { ...extrasState },
-      batsmen: [...dismissed.map(b => ({ ...b, status: b.how })), ...batsmen.map((b, i) => ({ ...b, status: i === striker ? 'not out *' : 'not out' }))],
-      bowlers: [...doneBowlers, { ...bowler, overs: `${Math.floor(bowler.balls / 6)}.${bowler.balls % 6}` }]
+      battingScorecard: [...dismissed.map(b => ({ ...b, status: b.how })), ...batsmen.map((b, i) => ({ ...b, status: i === striker ? 'not out *' : 'not out' }))],
+      bowlingScorecard: [...doneBowlers, { ...bowler, overs: `${Math.floor(bowler.balls / 6)}.${bowler.balls % 6}` }]
     };
     setInnings1Data(i1Summary);
     setTarget(totalScore + 1);
@@ -488,6 +567,21 @@ function Scoreboard({ data, onMatchEnd }) {
       ...batsmen.map((b, i) => ({ ...b, status: i === striker ? 'not out *' : 'not out' }))
     ];
 
+    const currentInningsSummary = {
+      teamName: activeBattingTeam,
+      score: totalScore,
+      wkts: wkts,
+      overs: `${overs}.${ballsThisOver}`,
+      extras: extrasState,
+      battingScorecard: currentBattingScorecard,
+      bowlingScorecard: allBowlersList.map(b => ({ name: b.name, overs: `${Math.floor(b.balls / 6)}.${b.balls % 6}`, runs: b.runs, wkts: b.wkts }))
+    };
+
+    const firstInningsSummary = innings === 2 && innings1Data ? {
+      teamName: activeBattingTeam === data.teamA.name ? data.teamB.name : data.teamA.name,
+      ...innings1Data
+    } : null;
+
     const isTeamABatting = activeBattingTeam === data.teamA.name;
 
     const summary = {
@@ -505,11 +599,10 @@ function Scoreboard({ data, onMatchEnd }) {
       teamBOvers: !isTeamABatting ? `${overs}.${ballsThisOver}` : (innings1Data ? (innings === 2 ? innings1Data.overs : undefined) : undefined),
       
       potm, bestBowler: bestBowlerAward,
-      battingTeam: activeBattingTeam, 
-      totalOvers: data.totalOvers,
-      extras: extrasState,
-      battingScorecard: currentBattingScorecard,
-      bowlingScorecard: allBowlersList.map(b => ({ name: b.name, overs: `${Math.floor(b.balls / 6)}.${b.balls % 6}`, runs: b.runs, wkts: b.wkts })),
+      innings1: innings === 2 ? firstInningsSummary : currentInningsSummary,
+      innings2: innings === 2 ? currentInningsSummary : null,
+      topBatsmen: topPerformers.batsmen,
+      topBowlers: topPerformers.bowlers,
       
       result: manualResult || (target ? (totalScore >= target ? `${activeBattingTeam} won by ${10 - wkts} wickets` : (isInningsOver ? `${activeBattingTeam === data.teamA.name ? data.teamB.name : data.teamA.name} won by ${target - 1 - totalScore} runs` : 'Match tied')) : 'Match Summary')
     };
@@ -596,6 +689,11 @@ function Scoreboard({ data, onMatchEnd }) {
     );
   }
 
+  const runsNeeded = target !== null ? target - totalScore : null;
+  const ballsRem = (totalOvers * 6) - legalBalls;
+  const reqRR = (runsNeeded !== null && ballsRem > 0) ? (runsNeeded / (ballsRem / 6)).toFixed(2) : '0.00';
+  const currRR = legalBalls > 0 ? (totalScore / (legalBalls / 6)).toFixed(2) : '0.00';
+
   // ── SCORING VIEW ───────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', background: '#f1f5f9', fontFamily: "'Outfit', sans-serif" }}>
@@ -608,6 +706,7 @@ function Scoreboard({ data, onMatchEnd }) {
               {activeBattingTeam}
             </div>
             <div style={{ fontSize: '52px', fontWeight: 900, lineHeight: 1, letterSpacing: '-3px' }}>{totalScore}<span style={{ color: '#60a5fa', margin: '0 4px' }}>/</span>{wkts}</div>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: '#60a5fa', marginTop: '6px' }}>CRR: {currRR}</div>
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: '26px', fontWeight: 800 }}>{overs}.{ballsThisOver}</div>
@@ -619,6 +718,17 @@ function Scoreboard({ data, onMatchEnd }) {
             </div>
           </div>
         </div>
+
+        {target && (
+          <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: '12px', padding: '10px 14px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontSize: '13px', fontWeight: 800 }}>
+              Need <span style={{ color: '#fbbf24', fontSize: '16px' }}>{runsNeeded}</span> runs in <span style={{ color: '#fbbf24', fontSize: '16px' }}>{ballsRem}</span> balls
+            </div>
+            <div style={{ fontSize: '11px', fontWeight: 700, opacity: 0.8, textAlign: 'right' }}>
+              REQ RR<br/><span style={{ fontSize: '14px', color: '#60a5fa' }}>{reqRR}</span>
+            </div>
+          </div>
+        )}
         <div>
           <div style={{ fontSize: '10px', fontWeight: 700, opacity: 0.5, textTransform: 'uppercase', marginBottom: '8px' }}>This Over</div>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', minHeight: '36px', alignItems: 'center' }}>
@@ -659,13 +769,40 @@ function Scoreboard({ data, onMatchEnd }) {
         {/* Run Buttons */}
         <div style={{ background: 'white', borderRadius: '20px', padding: '16px', boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}>
           <div style={{ fontSize: '9px', fontWeight: 800, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '1px', marginBottom: '12px' }}>Runs Off Bat</div>
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-            {[0, 1, 2, 3].map(r => <button key={r} onClick={() => handleRun(r)} style={runBtnStyle()}>{r}</button>)}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+            {[0, 1, 2, 3].map(r => (
+              <button 
+                key={r} 
+                onClick={() => { hapticFeedback(); handleRun(r); }} 
+                className="tactile-btn"
+                style={runBtnStyle()}
+              >
+                {r}
+              </button>
+            ))}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={() => handleRun(4)} style={{ ...runBtnStyle('#eff6ff', '#2563eb'), flexGrow: 1 }}>4</button>
-            <button onClick={() => handleRun(6)} style={{ ...runBtnStyle('#f5f3ff', '#7c3aed'), flexGrow: 1 }}>6</button>
-            <button onClick={openWicketModal} style={{ ...runBtnStyle('#fef2f2', '#dc2626'), flexGrow: 2, fontSize: '16px' }}>OUT</button>
+            <button 
+              onClick={() => { hapticFeedback(); handleRun(4); }} 
+              className="tactile-btn tactile-btn-blue"
+              style={{ ...runBtnStyle('#eff6ff', '#2563eb'), flexGrow: 1 }}
+            >
+              4
+            </button>
+            <button 
+              onClick={() => { hapticFeedback(); handleRun(6); }} 
+              className="tactile-btn tactile-btn-purple"
+              style={{ ...runBtnStyle('#f5f3ff', '#7c3aed'), flexGrow: 1 }}
+            >
+              6
+            </button>
+            <button 
+              onClick={() => { hapticFeedback(); openWicketModal(); }} 
+              className="tactile-btn tactile-btn-red"
+              style={{ ...runBtnStyle('#fef2f2', '#dc2626'), flexGrow: 2, fontSize: '16px' }}
+            >
+              OUT
+            </button>
           </div>
         </div>
 
@@ -676,14 +813,19 @@ function Scoreboard({ data, onMatchEnd }) {
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {[
-              { label: 'Wide', fn: handleWide, bg: '#fff7ed', bdr: '#fed7aa', col: '#c2410c' },
-              { label: 'No Ball', fn: () => handleNoBall(0), bg: '#fff7ed', bdr: '#fed7aa', col: '#c2410c' },
-              { label: 'Bye 1', fn: () => handleBye(1), bg: '#f8fafc', bdr: '#e2e8f0', col: '#475569' },
-              { label: 'Bye 2', fn: () => handleBye(2), bg: '#f8fafc', bdr: '#e2e8f0', col: '#475569' },
-              { label: 'LB 1', fn: () => handleLegBye(1), bg: '#f8fafc', bdr: '#e2e8f0', col: '#475569' },
-              { label: 'LB 2', fn: () => handleLegBye(2), bg: '#f8fafc', bdr: '#e2e8f0', col: '#475569' },
-            ].map(({ label, fn, bg, bdr, col }) => (
-              <button key={label} onClick={fn} style={{ flex: 1, minWidth: '60px', padding: '12px 6px', background: bg, border: `1.5px solid ${bdr}`, borderRadius: '12px', fontSize: '12px', fontWeight: 800, color: col, cursor: 'pointer' }}>{label}</button>
+              { label: 'Wide', fn: () => setExtraRunsModal('wide'), bg: '#fff7ed', bdr: '#fed7aa', col: '#c2410c', cls: 'tactile-btn-amber' },
+              { label: 'No Ball', fn: () => setExtraRunsModal('noBall'), bg: '#fff7ed', bdr: '#fed7aa', col: '#c2410c', cls: 'tactile-btn-amber' },
+              { label: 'Bye', fn: () => setExtraRunsModal('bye'), bg: '#f8fafc', bdr: '#e2e8f0', col: '#475569', cls: 'tactile-btn-slate' },
+              { label: 'Leg Bye', fn: () => setExtraRunsModal('legBye'), bg: '#f8fafc', bdr: '#e2e8f0', col: '#475569', cls: 'tactile-btn-slate' },
+            ].map(({ label, fn, bg, bdr, col, cls }) => (
+              <button 
+                key={label} 
+                onClick={() => { hapticFeedback(); fn(); }} 
+                className={`tactile-btn ${cls}`}
+                style={{ flex: 1, minWidth: '60px', padding: '12px 6px', background: bg, border: 'none', borderRadius: '12px', fontSize: '12px', fontWeight: 800, color: col, cursor: 'pointer' }}
+              >
+                {label}
+              </button>
             ))}
           </div>
         </div>
@@ -712,9 +854,43 @@ function Scoreboard({ data, onMatchEnd }) {
               <button key={wt} onClick={() => setWkType(wt)} style={{ padding: '10px 16px', borderRadius: '12px', border: '1.5px solid', borderColor: wkType === wt ? '#2563eb' : '#e2e8f0', background: wkType === wt ? '#eff6ff' : 'white', color: wkType === wt ? '#2563eb' : '#0f172a', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}>{wt}</button>
             ))}
           </div>
+          {wkType === 'Run Out' && (
+            <div style={{ marginBottom: '16px', background: '#f8fafc', padding: '12px', borderRadius: '12px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '8px' }}>Run Out Details</div>
+              
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                <button 
+                  onClick={() => setRunOutDetails(d => ({ ...d, outStriker: true }))}
+                  style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1.5px solid', borderColor: runOutDetails.outStriker ? '#2563eb' : '#e2e8f0', background: runOutDetails.outStriker ? '#eff6ff' : 'white', fontSize: '12px', fontWeight: 700 }}
+                >
+                  Striker Out
+                </button>
+                <button 
+                  onClick={() => setRunOutDetails(d => ({ ...d, outStriker: false }))}
+                  style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1.5px solid', borderColor: !runOutDetails.outStriker ? '#2563eb' : '#e2e8f0', background: !runOutDetails.outStriker ? '#eff6ff' : 'white', fontSize: '12px', fontWeight: 700 }}
+                >
+                  Non-Striker Out
+                </button>
+              </div>
+
+              <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', marginBottom: '6px' }}>Runs Completed</div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {[0, 1, 2, 3].map(r => (
+                  <button 
+                    key={r}
+                    onClick={() => setRunOutDetails(d => ({ ...d, runs: r }))}
+                    style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1.5px solid', borderColor: runOutDetails.runs === r ? '#2563eb' : '#e2e8f0', background: runOutDetails.runs === r ? '#eff6ff' : 'white', fontWeight: 700 }}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {wkType && NEEDS_FIELDER.includes(wkType) && (
             <div style={{ marginBottom: '12px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '6px' }}>{wkType === 'Caught' ? 'Caught by' : wkType === 'Stumped' ? 'Stumped by' : 'Run Out by'}</div>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '6px' }}>{wkType === 'Caught' ? 'Caught by' : wkType === 'Stumped' ? 'Stumped by' : 'Fielder / Keeper'}</div>
               <input 
                 value={fielder} 
                 onChange={e => {
@@ -1034,6 +1210,63 @@ function Scoreboard({ data, onMatchEnd }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── EXTRA RUNS MODAL (WIDE/NB) ── */}
+      {extraRunsModal && (
+        <Overlay>
+          <div style={{ fontSize: '18px', fontWeight: 800, marginBottom: '4px' }}>
+            {extraRunsModal === 'wide' ? 'Wide Ball' : extraRunsModal === 'noBall' ? 'No Ball' : extraRunsModal === 'bye' ? 'Byes' : 'Leg Byes'}
+          </div>
+          <div style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '20px' }}>
+            {extraRunsModal === 'wide' ? 'Select runs taken (if any):' : extraRunsModal === 'noBall' ? 'Select runs off bat (if any):' : 'Select runs taken:'}
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '20px' }}>
+            {[0, 1, 2, 3].map(r => (
+              <button 
+                key={r} 
+                onClick={() => {
+                  if (extraRunsModal === 'wide') confirmWide(r);
+                  else if (extraRunsModal === 'noBall') confirmNoBall(r);
+                  else if (extraRunsModal === 'bye') confirmBye(r);
+                  else confirmLegBye(r);
+                }}
+                style={{ ...runBtnStyle(), minHeight: '50px' }}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '24px' }}>
+            <button 
+              onClick={() => {
+                if (extraRunsModal === 'wide') confirmWide(4);
+                else if (extraRunsModal === 'noBall') confirmNoBall(4);
+                else if (extraRunsModal === 'bye') confirmBye(4);
+                else confirmLegBye(4);
+              }}
+              style={{ ...runBtnStyle('#eff6ff', '#2563eb'), minHeight: '50px' }}
+            >
+              4 (Bdry)
+            </button>
+            {extraRunsModal === 'noBall' && (
+              <button 
+                onClick={() => confirmNoBall(6)}
+                style={{ ...runBtnStyle('#f5f3ff', '#7c3aed'), minHeight: '50px' }}
+              >
+                6
+              </button>
+            )}
+          </div>
+          
+          <button 
+            onClick={() => setExtraRunsModal(null)} 
+            style={{ width: '100%', padding: '16px', borderRadius: '14px', border: '1.5px solid #e2e8f0', background: 'white', fontWeight: 700, fontSize: '14px', cursor: 'pointer' }}
+          >
+            Cancel
+          </button>
+        </Overlay>
       )}
     </div>
   );
